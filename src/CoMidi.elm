@@ -31,9 +31,8 @@ import Debug exposing (..)
 type alias Ticks = Int
 
 {-| Midi Event -}
-type MidiEvent = MidiEvent
-                -- meta messages
-                | SequenceNumber Int
+type MidiEvent = -- meta messages
+                  SequenceNumber Int
                 | Text String
                 | Copyright String
                 | TrackName String
@@ -49,7 +48,7 @@ type MidiEvent = MidiEvent
                 | SequencerSpecific String
                 | SysEx String
                 | TrackEnd
-                -- channel messages
+                 -- channel messages
                 | NoteOn Int Int Int
                 | NoteOff Int Int Int
                 | NoteAfterTouch Int Int Int
@@ -100,19 +99,34 @@ brange xs = choice <| List.map bchar xs
 bchoice : Int -> Int -> Parser Int
 bchoice x y = bchar x <|> bchar y
 
+-- rather awkward set of functions to build fixed length integers 
 shiftInt8 : Parser (Int -> Int)
 shiftInt8 = (\i -> \j -> (shiftLeft i 8) + j) <$> int8
 
+shiftInt16 : Parser (Int -> Int -> Int)
+shiftInt16 = (\i -> 
+               \j -> 
+                \k -> 
+                  (shiftLeft i 16) + (shiftLeft j 8) + k) <$> int8
+
+shiftInt24 : Parser (Int -> Int -> Int -> Int)
+shiftInt24 = (\i -> 
+               \j -> 
+                \k -> 
+                 \l ->
+                   (shiftLeft i 24) + (shiftLeft j 16) + (shiftLeft k 8) +  l) <$> int8
+
 int16 : Parser Int
 int16 = shiftInt8 <*> int8
--- int16 = log "int16:" <$> (shiftInt8 <*> int8)
+--int16 = log "int16:" <$> (shiftInt8 <*> int8)
 
 int24 : Parser Int
-int24 = shiftInt8 <*> (shiftInt8 <*> int8)
+int24 = shiftInt16 <*> int8 <*> int8
+--int24 = log "int24" <$> ( shiftInt16 <*> int8 <*> int8)
 
 int32 : Parser Int
-int32 = shiftInt8 <*> (shiftInt8 <*> (shiftInt8 <*> int8))
--- int32 = log "int32:" <$> (shiftInt8 <*> (shiftInt8 <*> (shiftInt8 <*> int8)))
+int32 = shiftInt24 <*> int8 <*> int8 <*> int8
+--int32 = log "int32" <$> (shiftInt24 <*> int8 <*> int8 <*> int8)
 
 varInt : Parser Int
 varInt = 
@@ -177,7 +191,7 @@ metaEvent = bchar 0xFF *> choice [ parseSequenceNumber
                                  , parseTrackEnd ]
 
 parseSequenceNumber : Parser MidiEvent
-parseSequenceNumber = SequenceNumber <$> (bchar 0x00 *> varInt *> int16)
+parseSequenceNumber = SequenceNumber <$> (bchar 0x00 *> bchar 0x02 *> int16)
 
 {- parse a simple string-valued meta event -}
 parseMetaString : Int -> Parser String
@@ -206,19 +220,19 @@ parseCuePoint : Parser MidiEvent
 parseCuePoint = CuePoint <$> parseMetaString 0x07
 
 parseChannelPrefix : Parser MidiEvent
-parseChannelPrefix = ChannelPrefix <$> (bchar 0x20 *> varInt *> int8)
+parseChannelPrefix = ChannelPrefix <$> (bchar 0x20 *> bchar 0x01 *> int8)
 
 parseTempoChange : Parser MidiEvent
-parseTempoChange = log "set tempo:" <$> (Tempo <$> (bchar 0x51 *> varInt *> int24 ))
+parseTempoChange = log "set tempo:" <$> (Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24 ))
 
 parseSMPTEOffset : Parser MidiEvent
-parseSMPTEOffset = bchar 0x54 *> varInt *> (SMPTEOffset <$> int8 <*> int8 <*> int8 <*> int8 <*> int8)
+parseSMPTEOffset = bchar 0x54 *> bchar 0x03 *> (SMPTEOffset <$> int8 <*> int8 <*> int8 <*> int8 <*> int8)
 
 parseTimeSignature : Parser MidiEvent
-parseTimeSignature = log "time sig:" <$> (bchar 0x58 *> varInt *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8 ))
+parseTimeSignature = log "time sig:" <$> (bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8 ))
 
 parseKeySignature : Parser MidiEvent
-parseKeySignature = log "key sig:" <$>  (bchar 0x59 *> varInt *> (KeySignature <$> signedInt8 <*> int8))
+parseKeySignature = log "key sig:" <$>  (bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8))
 
 parseSequencerSpecific : Parser MidiEvent
 parseSequencerSpecific = SequencerSpecific <$> parseMetaString 0x7F
