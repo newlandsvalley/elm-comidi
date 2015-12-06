@@ -15,7 +15,6 @@ The following aspects have so far not been addressed:
 *  Running Status messages
 *  Ignoring unexpected chunk types
 *  Handling unexpected chunk or event length (e.g. header size greater than 6) 
-*  Fully contextual error reporting
 
 In other respects, it appears to be perfectly adequate to parse the abovementioned files.
 
