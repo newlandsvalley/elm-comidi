@@ -12,7 +12,6 @@ Limitations
 
 The following aspects have so far not been addressed:
 
-*  Running Status messages
 *  Ignoring unexpected chunk types
 *  Handling unexpected chunk or event length (e.g. header size greater than 6) 
 

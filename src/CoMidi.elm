@@ -56,6 +56,7 @@ type MidiEvent = -- meta messages
                 | ProgramChange Int Int
                 | ChannelAfterTouch Int Int 
                 | PitchBend Int Int
+                | RunningStatus Int Int
 
 {-| Midi Message -}    
 type alias MidiMessage = (Ticks, MidiEvent)
@@ -154,7 +155,8 @@ midiTracks = many1 midiTrack <?> "midi tracks"
 
 midiTrack : Parser Track
 midiTrack = string "MTrk" *> int32 *> many1 midiMessage  <?> "midi track"
-                   
+
+-- Note - it is important that runningStatus is placed last because of its catch-all definition               
 midiMessage : Parser MidiMessage
 midiMessage = 
    (,) <$> varInt 
@@ -165,7 +167,8 @@ midiMessage =
                     , controlChange
                     , programChange 
                     , channelAfterTouch
-                    , pitchBend ]
+                    , pitchBend 
+                    , runningStatus ]
         <?> "midi message"
 
 -- metadata parsers
@@ -267,8 +270,12 @@ channelAfterTouch = log "channel afterTouch:" <$> ( buildChannelAfterTouch <$> b
 pitchBend : Parser MidiEvent
 pitchBend = log "pitch bend:" <$> ( buildPitchBend <$> brange [0xE0..0xEF] <*> int8 <*> int8 <?> "pitch bend")
 
+{- running status is somewhat anomalous.  It inherits the 'type' last event parsed, which must be a channel event. 
+   This inherited channel event type is not put into the parse tree - this is left to an interpreter -}
+runningStatus : Parser MidiEvent
+runningStatus = log "running status:" <$> ( RunningStatus <$> int8 <*> int8 <?> "running status")
 
--- result builders
+-- result builder
 
 {- build NoteOn (unless the velocity is zero in which case NoteOff) -}
 buildNote : Int -> Int -> Int -> MidiEvent
