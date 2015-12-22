@@ -144,11 +144,23 @@ rest = many anyChar
 midi : Parser MidiRecording
 midi = (,) <$> midiHeader <*> midiTracks
 
+{- simple parser for headers which assumes chunk size is 6
 midiHeader : Parser Header
 midiHeader = string "MThd" 
                *> int32 
                *> ( Header <$>  int16 <*> int16 <*> int16 )  
                <?> "header"
+-}
+
+{- parser for headers which quietly eats any extra bytes if we have a non-standard chunk size -} 
+midiHeader : Parser Header
+midiHeader = string "MThd" 
+               *> 
+                 let 
+                   h = headerChunk <$> int32 <*> int16 <*> int16 <*> int16
+                 in 
+                   consumeOverspill h 6
+                   <?> "header"      
 
 midiTracks : Parser (List Track)
 midiTracks = many1 midiTrack <?> "midi tracks"
@@ -277,6 +289,13 @@ runningStatus = log "running status:" <$> ( RunningStatus <$> int8 <*> int8 <?> 
 
 -- result builder
 
+{- build a Header and make the chunk length available so that any overspill bytes can
+   later be quietly ignored
+-}
+headerChunk : Int -> Int -> Int -> Int -> (Int, Header)
+headerChunk l a b c =
+  (l, Header a b c)
+
 {- build NoteOn (unless the velocity is zero in which case NoteOff) -}
 buildNote : Int -> Int -> Int -> MidiEvent
 buildNote cmd note velocity = 
@@ -330,6 +349,19 @@ buildTimeSig nn dd cc bb =
    in TimeSignature nn denom cc bb
    
 -- utility functions
+
+{- consume the overspill from a non-standard size chunk 
+   actual is the parsed actual chunk size followed by the chunk contents (which are returned)
+   expected is the expected size of the chunk
+   consume the rest if the difference suggests an overspill of unwanted chunk material
+-}
+consumeOverspill : Parser (Int, a) -> Int -> Parser a
+consumeOverspill actual expected =
+  actual `andThen` 
+    (\(cnt, rest) -> 
+      map (\_ -> rest) 
+       <| skip 
+       <| count (cnt - expected) int8 )
 
 topBitSet : Int -> Bool
 topBitSet n = n `and` 0x80 > 0 
