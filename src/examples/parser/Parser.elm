@@ -97,8 +97,6 @@ parseLoadedFile r =
 
 -- VIEW
 
--- (=>) = (,)
-
 viewParseResult : Result String MidiRecording -> String
 viewParseResult mr = 
    case mr of
@@ -111,8 +109,10 @@ viewParseResult mr =
 view : Signal.Address Action -> Model -> Html
 view address model =
   div []
-    [ button [ onClick address (Load "midi/lillasystern.midi") ] [ text "load" ]
-      ,div [  ] [ text ("parse result: " ++ (viewParseResult model.recording)) ]
+    [ button [ onClick address (Load "midi/lillasystern.midi") ] [ text "load type-0" ]
+    , button [ onClick address (Load "midi/carolansreceipt.midi") ] [ text "load type-1" ]
+    , button [ onClick address (Load "midi/Galway-Hornpipe.midi") ] [ text "load parse fail" ]
+    , div [  ] [ text ("parse result: " ++ (viewParseResult model.recording)) ]
     ]
 
 -- INPUTS

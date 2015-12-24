@@ -28,6 +28,7 @@ import Char exposing (fromCode, toCode)
 import String exposing (fromList, toList)
 import Debug exposing (..)
 
+
 type alias Ticks = Int
 
 {-| Midi Event -}
@@ -47,7 +48,6 @@ type MidiEvent = -- meta messages
                 | KeySignature Int Int
                 | SequencerSpecific String
                 | SysEx String
-                | TrackEnd
                  -- channel messages
                 | NoteOn Int Int Int
                 | NoteOff Int Int Int
@@ -73,7 +73,6 @@ type alias Header =
 
 {-| Midi Recording -}
 type alias MidiRecording = (Header, List Track)
-
 
 -- low level parsers 
 
@@ -165,8 +164,12 @@ midiHeader = string "MThd"
 midiTracks : Parser (List Track)
 midiTracks = many1 midiTrack <?> "midi tracks"
 
+{- we don't place TrackEnd events into the parse tree - there is no need.
+   The end of the track is implied by the end of the event list 
+-}
 midiTrack : Parser Track
-midiTrack = string "MTrk" *> int32 *> many1 midiMessage  <?> "midi track"
+midiTrack = string "MTrk" *> int32 *> many1 midiMessage <* trackEndMessage  <?> "midi track"
+-- midiTrack = string "MTrk" *> int32 *> manyTill midiMessage trackEndMessage  <?> "midi track"
 
 -- Note - it is important that runningStatus is placed last because of its catch-all definition               
 midiMessage : Parser MidiMessage
@@ -179,8 +182,8 @@ midiMessage =
                     , controlChange
                     , programChange 
                     , channelAfterTouch
-                    , pitchBend 
-                    , runningStatus ]
+                    , pitchBend ]
+                    -- , runningStatus ] -- don't know how to handle this yet
         <?> "midi message"
 
 -- metadata parsers
@@ -202,8 +205,8 @@ metaEvent =
                , parseTimeSignature
                , parseKeySignature
                , parseSequencerSpecific
-               , parseSysEx
-               , parseTrackEnd ]
+               , parseSysEx ]
+               --, parseTrackEnd ]
      <?> "meta event"
 
 parseSequenceNumber : Parser MidiEvent
@@ -230,7 +233,7 @@ parseLyrics : Parser MidiEvent
 parseLyrics = Lyrics <$> parseMetaString 0x05 <?> "lyrics"
 
 parseMarker : Parser MidiEvent
-parseMarker = Marker <$> parseMetaString 0x06 <?> "marker"
+parseMarker = log "marker:" <$> (Marker <$> parseMetaString 0x06 <?> "marker" )
 
 parseCuePoint : Parser MidiEvent
 parseCuePoint = CuePoint <$> parseMetaString 0x07 <?> "cue point"
@@ -256,8 +259,14 @@ parseSequencerSpecific = SequencerSpecific <$> parseMetaString 0x7F <?> "sequenc
 parseSysEx : Parser MidiEvent
 parseSysEx = SysEx <$> (String.fromList <$> (bchoice 0xF0 0xF7 *> varInt `andThen` (\l -> count l anyChar))) <?> "system exclusive"
 
+{-
 parseTrackEnd : Parser MidiEvent
 parseTrackEnd =   log "track end:" <$>  (bchar 0x2F *> varInt *> succeed TrackEnd <?> "track end" )
+-}
+
+{- parse an entire Track End message - not simply the event -}
+trackEndMessage : Parser ()
+trackEndMessage =   log "track end:" <$>  (varInt *> bchar 0xFF *> bchar 0x2F *> bchar 0x00 *> succeed () <?> "track end" )
 
 -- channel parsers
 
@@ -387,7 +396,7 @@ expect f p = p `andThen`
 parse : String -> Result.Result String MidiRecording
 parse s =
   case Combine.parse (midi <* end) s of
-  -- case parse (midi <* rest <* end) s of
+  -- case Combine.parse (midi <* rest <* end) s of
     (Done n, _) ->
       Ok n
 
