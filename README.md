@@ -10,9 +10,9 @@ Tradtunestore uses only Type-0 (single track) MIDI files which are supported in 
 Limitations
 -----------
 
-Type-0 files are handled successfully.  Some Type-1 files are parsed and others are not for reasons that are not entirely clear at the moment.  Type-2 has not been tested.
+Type-0 (and now, I hope, Type-1) files are handled successfully. Type-2 has not been tested.
 
-In order to improve Type-1 handling, support fpr Running Status messages has been lost.
+Support for Running Status messages has been added again, but this is extremely inefficient and noticeably slow.
  
 
 
