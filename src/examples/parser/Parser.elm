@@ -109,9 +109,10 @@ viewParseResult mr =
 view : Signal.Address Action -> Model -> Html
 view address model =
   div []
-    [ button [ onClick address (Load "midi/lillasystern.midi") ] [ text "load type-0" ]
-    , button [ onClick address (Load "midi/carolansreceipt.midi") ] [ text "load type-1" ]
-    , button [ onClick address (Load "midi/Galway-Hornpipe.midi") ] [ text "load parse fail" ]
+    [ button [ onClick address (Load "midi/lillasystern.midi") ] [ text "lillasystern (type-0)" ]
+    , button [ onClick address (Load "midi/carolansreceipt.midi") ] [ text "Carolan's Receipt (type-1)" ]
+    , button [ onClick address (Load "midi/Galway-Hornpipe.midi") ] [ text "Galway Hornpipe (unspecified meta)" ]
+    , button [ onClick address (Load "midi/frost.midi") ] [ text "Frost is all over (running status)" ]
     , div [  ] [ text ("parse result: " ++ (viewParseResult model.recording)) ]
     ]
 
