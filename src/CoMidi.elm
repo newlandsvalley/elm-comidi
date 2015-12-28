@@ -94,40 +94,23 @@ bchar val = toCode <$> char (fromCode(val))
 -- bchar val = log "bchar" <$> ( toCode <$> char (fromCode(val)))
 
 {- parse an 8 bit integer lying within a range -}
-brange : List Int -> Parser Int
-brange xs = choice <| List.map bchar xs
+brange : Int -> Int -> Parser Int
+brange l r =
+  let
+    f a = toCode a >= l && toCode a <= r
+  in 
+    toCode <$> satisfy f 
 
 {- parse a choice between a pair of 8 bit integers -}
 bchoice : Int -> Int -> Parser Int
 bchoice x y = bchar x <|> bchar y
 
-{- parse any byte that is NOT a TrackEnd status byte
-   This is tricky in Elm.  We have regexes that deal in strings but we deal in bytes
-   so we must transform any match to the regex to a char (guaranteed to be present 
-   if the regex matches) and so the Maybe default is effectively irrelevant
--}
 notTrackEnd : Parser Int
 notTrackEnd =
-  let 
-    f = toList
-        >> List.head
-        >> withDefault ' '
-        >> toCode
-  in
-    f <$> regex "[^\x2F]"
-
-{- this is unusable because (I think) the character range is outside that accepted by regex
-   it produces Invalid regular expression: Range out of order in character class
-dataByte : Parser Int
-dataByte =
-  let 
-    f = toList
-        >> List.head
-        >> withDefault ' '
-        >> toCode
-  in
-    f <$> regex "[\x00-\x7F]"
--}
+   let
+     c = fromCode 0x2F
+   in 
+     toCode <$> noneOf [c]
 
 -- fixed length integers 
 
@@ -173,7 +156,7 @@ midi : Parser MidiRecording
 midi = midiHeader `andThen` midiTracks
 
 {- this version of the top level parser just parses many tracks
-   without checkinh whether the track count agrees with the header
+   without checking whether the track count agrees with the header
 midi0 : Parser MidiRecording
 midi0 = (,) <$> midiHeader <*> midiTracks0
 
@@ -301,7 +284,7 @@ parseSysEx = SysEx <$> (String.fromList <$> (bchoice 0xF0 0xF7 *> varInt `andThe
    The possible range for the type is 00-7F. Not all values in this range are defined, but programs must be able 
    to cope with (ie ignore) unexpected values by examining the length and skipping over the data portion.
    We cope by accepting any value here except TrackEnd which is the terminating condition for the list of MidiEvents
-   and so must not be recognizsed here 
+   and so must not be recognized here 
 -}
 parseUnspecified : Parser MidiEvent
 parseUnspecified = log "unspecified" <$> (Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8 )))
@@ -318,30 +301,30 @@ trackEndMessage =   log "track end" <$>  (varInt *> bchar 0xFF *> bchar 0x2F *> 
 -- channel parsers
 
 noteOn : Parser MidiEvent
-noteOn = log "note on" <$> ( buildNote <$> brange [0x90..0x9F] <*> int8 <*> int8 <?> "note on" )
+noteOn = log "note on" <$> ( buildNote <$> brange 0x90 0x9F <*> int8 <*> int8 <?> "note on" )
 
 noteOff : Parser MidiEvent
-noteOff = log "note off" <$> ( buildNoteOff <$> brange [0x80..0x8F] <*> int8 <*> int8 <?> "note off" )
+noteOff = log "note off" <$> ( buildNoteOff <$> brange 0x80 0x8F <*> int8 <*> int8 <?> "note off" )
 
 noteAfterTouch : Parser MidiEvent
-noteAfterTouch = log "note afterTouch" <$> ( buildNoteAfterTouch <$> brange [0xA0..0xAF] <*> int8 <*> int8 <?> "note after touch" )
+noteAfterTouch = log "note afterTouch" <$> ( buildNoteAfterTouch <$> brange 0xA0 0xAF <*> int8 <*> int8 <?> "note after touch" )
 
 controlChange : Parser MidiEvent
-controlChange = log "control change" <$> ( buildControlChange <$> brange [0xB0..0xBF] <*> int8 <*> int8 <?> "control change" )
+controlChange = log "control change" <$> ( buildControlChange <$> brange 0xB0 0xBF <*> int8 <*> int8 <?> "control change" )
 
 programChange : Parser MidiEvent
-programChange = log "program change" <$> ( buildProgramChange <$> brange [0xC0..0xCF] <*> int8 <?> "program change" )
+programChange = log "program change" <$> ( buildProgramChange <$> brange 0xC0 0xCF <*> int8 <?> "program change" )
 
 channelAfterTouch : Parser MidiEvent
-channelAfterTouch = log "channel afterTouch" <$> ( buildChannelAfterTouch <$> brange [0xD0..0xDF] <*> int8 <?> "channel after touch")
+channelAfterTouch = log "channel afterTouch" <$> ( buildChannelAfterTouch <$> brange 0xD0 0xDF <*> int8 <?> "channel after touch")
 
 pitchBend : Parser MidiEvent
-pitchBend = log "pitch bend" <$> ( buildPitchBend <$> brange [0xE0..0xEF] <*> int8 <*> int8 <?> "pitch bend")
+pitchBend = log "pitch bend" <$> ( buildPitchBend <$> brange 0xE0 0xEF <*> int8 <*> int8 <?> "pitch bend")
 
 {- running status is somewhat anomalous.  It inherits the 'type' last event parsed, which must be a channel event. 
    This inherited channel event type is not put into the parse tree - this is left to an interpreter -}
 runningStatus : Parser MidiEvent
-runningStatus = log "running status" <$> ( RunningStatus <$> brange [0x00..0x7F] <*> int8 <?> "running status")
+runningStatus = log "running status" <$> ( RunningStatus <$> brange 0x00 0x7F  <*> int8 <?> "running status")
 
 -- result builder
 
@@ -447,7 +430,6 @@ parse : String -> Result.Result String MidiRecording
 parse s =
   case Combine.parse midi s of 
   -- case Combine.parse (midi <* end) s of
-  -- case Combine.parse (midi <* rest <* end) s of
     (Done n, _) ->
       Ok n
 
