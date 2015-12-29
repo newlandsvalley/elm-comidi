@@ -12,7 +12,7 @@ Limitations
 
 Type-2 has not yet been tested.
 
-Running Status messages are supported and placed in the parse tree as such, but perhaps would be better translated into the appropriate channel voice message rather than being left to a later interpreter.  
+Running Status messages are supported and placed in the parse tree as such.  A function 'translateRunningStatus' can be used after parsing to convert them into the appropriate NoteOn/NoteOff etc. message. It would perhaps be better if they were immediately translated by the parser into the appropriate channel voice message.  
  
 
 

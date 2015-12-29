@@ -6,6 +6,7 @@ module CoMidi
     , MidiRecording
     , normalise
     , parse
+    , translateRunningStatus
     ) where
 
 {-|  Library for parsing MIDI file contents using parser combinators,
@@ -16,7 +17,7 @@ module CoMidi
 @docs Header, Track, MidiEvent, MidiMessage,  MidiRecording
 
 # Functions
-@docs normalise, parse
+@docs normalise, parse, translateRunningStatus
 
 -}
 
@@ -28,6 +29,7 @@ import Char exposing (fromCode, toCode)
 import String exposing (fromList, toList)
 import Debug exposing (..)
 import Maybe exposing (withDefault)
+-- import List exposing (foldLeft)
 
 
 type alias Ticks = Int
@@ -204,7 +206,7 @@ midiMessage =
                     , programChange 
                     , channelAfterTouch
                     , pitchBend 
-                    , runningStatus ] -- don't know how to handle this efficiently yet
+                    , runningStatus ]
         <?> "midi message"
 
 -- metadata parsers
@@ -422,6 +424,62 @@ expect f p = p `andThen`
             True -> succeed b
             _ -> fail [ "unexpected:" ++ toString b ]
           )
+
+-- translation of Running Status messages to NoteOn/NoteOff etc
+
+{- Translate the next message in a track if it has a Running Status event.
+   Keep track of state - the event that first kicks of sequence of Running Status events.
+   If the incoming event happens in the context of channel voice message state, then translate
+   the message to that of the saved state (but using the parameters from the Running Status) 
+   Otherwise, if not a Running Status event, just keep hold of the event unchanged.
+-}
+translateNextEvent : MidiMessage -> (MidiEvent, List MidiMessage) -> (MidiEvent, List MidiMessage)
+translateNextEvent nextMessage acc =
+  let
+    (state, events) = acc
+    (ticks, next) = nextMessage
+  in case next of
+    RunningStatus x y ->
+      let 
+        translatedStatus = interpretRS state x y
+      in case translatedStatus of
+        Unspecified _ _ ->            -- couldn't translate the running status so drop it
+           (state, events)
+        _ ->                          -- could translate the running status so adopt it
+        (state, (ticks, translatedStatus) :: events)
+    other -> (other, nextMessage :: events)  -- just update the state
+
+{- we can interpret the running status if we have a legitimate last event state which is a channel voice event -}
+interpretRS : MidiEvent -> Int -> Int -> MidiEvent
+interpretRS last x y =
+   case last of 
+     NoteOn chan _ _ -> 
+       if (y == 0) then
+         NoteOff chan x y
+       else
+         NoteOn chan x y
+     NoteOff chan _ _ -> 
+       NoteOff chan x y
+     NoteAfterTouch chan _ _ -> 
+       NoteAfterTouch chan x y
+     ControlChange chan _ _ -> 
+       ControlChange chan x y
+     ProgramChange _ _ -> 
+       ProgramChange x y
+     ChannelAfterTouch _ _ -> 
+       ChannelAfterTouch x y
+     PitchBend _ _ -> 
+       PitchBend x y
+     _ -> 
+       Unspecified 0 []
+
+translateAllRunningStatus : Track -> Track
+translateAllRunningStatus =
+   List.foldl translateNextEvent ( Unspecified 0 [], []) 
+   >> snd
+   >> List.reverse
+   
+   
           
 -- exported functions
 
@@ -445,5 +503,18 @@ normalise =
    in
      String.toList >> List.map f >> String.fromList
 
+{- translate the Running Status messages in each track to the expanded form (NoteOn/NoteOff etc) -}
+translateRunningStatus : Result.Result String MidiRecording -> Result.Result String MidiRecording
+translateRunningStatus res =
+   case res of
+     Ok mr -> 
+       let
+         header = fst mr
+         tracks = snd mr |> List.map translateAllRunningStatus
+       in
+         Ok (header, tracks) 
+     err ->
+       err
+      
 
         
