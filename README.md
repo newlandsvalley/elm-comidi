@@ -7,6 +7,17 @@ It is a component of an intended eventual assemblage of modules that will allow 
 
 Hopefully, this version is a fully conformant parser which is happy with Type-0, Type-1 and Type-2 files.
 
+Dependencies
+------------
+
+*  Bogdanp/elm-combine  2.0.0
+*  elm-lang/core 3.0.0
+
+Examples
+--------
+
+Examples have been split off into the test directory with an independent elm-package.json in order to cut down dependencies in the library itself.
+
 Limitations
 -----------
 

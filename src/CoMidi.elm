@@ -503,7 +503,7 @@ normalise =
    in
      String.toList >> List.map f >> String.fromList
 
-{- translate the Running Status messages in each track to the expanded form (NoteOn/NoteOff etc) -}
+{-| translate the Running Status messages in each track to the expanded form (NoteOn/NoteOff etc) -}
 translateRunningStatus : Result.Result String MidiRecording -> Result.Result String MidiRecording
 translateRunningStatus res =
    case res of

@@ -1,6 +1,9 @@
 elm-stuff
 elm.js
 Main.html
-compilep.sh
-/src/examples/player/
+index.html
+/test/examples/player/
+/test/elm-stuff/
+/test/Main.html
+/test/compilep.sh
 /deprecated/
