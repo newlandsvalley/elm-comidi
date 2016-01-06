@@ -3,7 +3,21 @@ elm-comidi
 
 This is a parser for MIDI files written in pure elm and using the [elm-combine](https://github.com/Bogdanp/elm-combine) parser combinator library.
 
-It is a component of an intended eventual assemblage of modules that will allow me to replace [MIDI.js](https://github.com/mudcube/MIDI.js/) in my [tradtunestore](https://github.com/newlandsvalley/tradtunestore) web application. This is used to play MIDI files that have been automatically generated from tunes in [abc notation](http://www.lesession.co.uk/abc/abc_notation.htm) and that have been submitted by users. Other modules will include a soundfont loader and a web-audio player.  
+To parse a MIDI string you can use:
+
+    midi
+      |> normalise 
+      |> parse
+
+or:
+
+    midi 
+      |> normalise 
+      |> parse 
+      |> translateRunningStatus
+
+if the input contains running status messages that you would like to translate to the underlying channel messages.
+
 
 Hopefully, this version is a fully conformant parser which is happy with Type-0, Type-1 and Type-2 files.
 

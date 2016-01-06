@@ -241,13 +241,15 @@ parseMetaString target = String.fromList <$>
                           (bchar target *> varInt `andThen` (\l -> count l anyChar))
 
 parseText : Parser MidiEvent
-parseText = log "text" <$> (Text <$> parseMetaString 0x01 <?> "text" )
+parseText = Text <$> parseMetaString 0x01 <?> "text" 
+-- parseText = log "text" <$> (Text <$> parseMetaString 0x01 <?> "text" )
 
 parseCopyright : Parser MidiEvent
 parseCopyright = Copyright <$> parseMetaString 0x02 <?> "copyright"
 
 parseTrackName : Parser MidiEvent
-parseTrackName = log "track name" <$> (TrackName <$> parseMetaString 0x03 <?> "track name")
+parseTrackName = TrackName <$> parseMetaString 0x03 <?> "track name"
+-- parseTrackName = log "track name" <$> (TrackName <$> parseMetaString 0x03 <?> "track name")
 
 parseInstrumentName : Parser MidiEvent
 parseInstrumentName = InstrumentName <$> parseMetaString 0x04 <?> "instrument name"
@@ -256,7 +258,8 @@ parseLyrics : Parser MidiEvent
 parseLyrics = Lyrics <$> parseMetaString 0x05 <?> "lyrics"
 
 parseMarker : Parser MidiEvent
-parseMarker = log "marker" <$> (Marker <$> parseMetaString 0x06 <?> "marker" )
+parseMarker = Marker <$> parseMetaString 0x06 <?> "marker" 
+-- parseMarker = log "marker" <$> (Marker <$> parseMetaString 0x06 <?> "marker" )
 
 parseCuePoint : Parser MidiEvent
 parseCuePoint = CuePoint <$> parseMetaString 0x07 <?> "cue point"
@@ -265,16 +268,20 @@ parseChannelPrefix : Parser MidiEvent
 parseChannelPrefix = ChannelPrefix <$> (bchar 0x20 *> bchar 0x01 *> int8 <?> "channel prefix")
 
 parseTempoChange : Parser MidiEvent
-parseTempoChange = log "set tempo" <$> (Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24 ) <?> "tempo change")
+parseTempoChange = Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24 ) <?> "tempo change"
+-- parseTempoChange = log "set tempo" <$> (Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24 ) <?> "tempo change")
 
 parseSMPTEOffset : Parser MidiEvent
 parseSMPTEOffset = bchar 0x54 *> bchar 0x03 *> (SMPTEOffset <$> int8 <*> int8 <*> int8 <*> int8 <*> int8 <?> "SMTPE offset" )
 
 parseTimeSignature : Parser MidiEvent
-parseTimeSignature = log "time sig" <$> (bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8 ) <?> "time signature" )
+parseTimeSignature = bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8 ) <?> "time signature" 
+-- parseTimeSignature = log "time sig" <$> (bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8 ) <?> "time signature" )
 
 parseKeySignature : Parser MidiEvent
-parseKeySignature = log "key sig" <$>  (bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8))
+parseKeySignature = bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8)
+-- parseKeySignature = log "key sig" <$>  (bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8))
+
 
 parseSequencerSpecific : Parser MidiEvent
 parseSequencerSpecific = SequencerSpecific <$> parseMetaString 0x7F <?> "sequencer specific"
@@ -289,44 +296,48 @@ parseSysEx = SysEx <$> (String.fromList <$> (bchoice 0xF0 0xF7 *> varInt `andThe
    and so must not be recognized here 
 -}
 parseUnspecified : Parser MidiEvent
-parseUnspecified = log "unspecified" <$> (Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8 )))
-
-{- no longer used
-parseTrackEnd : Parser MidiEvent
-parseTrackEnd =   log "track end" <$>  (bchar 0x2F *> bchar 0x00 *> succeed TrackEnd <?> "track end" )
--}
+parseUnspecified = Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8 ))
+-- parseUnspecified = log "unspecified" <$> (Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8 )))
 
 {- parse an entire Track End message - not simply the event -}
 trackEndMessage : Parser ()
-trackEndMessage =   log "track end" <$>  (varInt *> bchar 0xFF *> bchar 0x2F *> bchar 0x00 *> succeed () <?> "track end" )
+trackEndMessage =   varInt *> bchar 0xFF *> bchar 0x2F *> bchar 0x00 *> succeed () <?> "track end" 
+-- trackEndMessage =   log "track end" <$>  (varInt *> bchar 0xFF *> bchar 0x2F *> bchar 0x00 *> succeed () <?> "track end" )
 
 -- channel parsers
 
 noteOn : Parser MidiEvent
-noteOn = log "note on" <$> ( buildNote <$> brange 0x90 0x9F <*> int8 <*> int8 <?> "note on" )
+noteOn = buildNote <$> brange 0x90 0x9F <*> int8 <*> int8 <?> "note on" 
+-- noteOn = log "note on" <$> ( buildNote <$> brange 0x90 0x9F <*> int8 <*> int8 <?> "note on" )
 
 noteOff : Parser MidiEvent
-noteOff = log "note off" <$> ( buildNoteOff <$> brange 0x80 0x8F <*> int8 <*> int8 <?> "note off" )
+noteOff = buildNoteOff <$> brange 0x80 0x8F <*> int8 <*> int8 <?> "note off" 
+-- noteOff = log "note off" <$> ( buildNoteOff <$> brange 0x80 0x8F <*> int8 <*> int8 <?> "note off" )
 
 noteAfterTouch : Parser MidiEvent
-noteAfterTouch = log "note afterTouch" <$> ( buildNoteAfterTouch <$> brange 0xA0 0xAF <*> int8 <*> int8 <?> "note after touch" )
+noteAfterTouch = buildNoteAfterTouch <$> brange 0xA0 0xAF <*> int8 <*> int8 <?> "note after touch" 
+-- noteAfterTouch = log "note afterTouch" <$> ( buildNoteAfterTouch <$> brange 0xA0 0xAF <*> int8 <*> int8 <?> "note after touch" )
 
 controlChange : Parser MidiEvent
-controlChange = log "control change" <$> ( buildControlChange <$> brange 0xB0 0xBF <*> int8 <*> int8 <?> "control change" )
+controlChange = buildControlChange <$> brange 0xB0 0xBF <*> int8 <*> int8 <?> "control change" 
+-- controlChange = log "control change" <$> ( buildControlChange <$> brange 0xB0 0xBF <*> int8 <*> int8 <?> "control change" )
 
 programChange : Parser MidiEvent
-programChange = log "program change" <$> ( buildProgramChange <$> brange 0xC0 0xCF <*> int8 <?> "program change" )
+programChange = buildProgramChange <$> brange 0xC0 0xCF <*> int8 <?> "program change" 
+-- programChange = log "program change" <$> ( buildProgramChange <$> brange 0xC0 0xCF <*> int8 <?> "program change" )
 
 channelAfterTouch : Parser MidiEvent
-channelAfterTouch = log "channel afterTouch" <$> ( buildChannelAfterTouch <$> brange 0xD0 0xDF <*> int8 <?> "channel after touch")
+channelAfterTouch = buildChannelAfterTouch <$> brange 0xD0 0xDF <*> int8 <?> "channel after touch"
+-- channelAfterTouch = log "channel afterTouch" <$> ( buildChannelAfterTouch <$> brange 0xD0 0xDF <*> int8 <?> "channel after touch")
 
 pitchBend : Parser MidiEvent
 pitchBend = log "pitch bend" <$> ( buildPitchBend <$> brange 0xE0 0xEF <*> int8 <*> int8 <?> "pitch bend")
 
-{- running status is somewhat anomalous.  It inherits the 'type' last event parsed, which must be a channel event. 
+{- running status is somewhat anomalous.  It inherits the 'type' of the last event parsed, which must be a channel event. 
    This inherited channel event type is not put into the parse tree - this is left to an interpreter -}
 runningStatus : Parser MidiEvent
-runningStatus = log "running status" <$> ( RunningStatus <$> brange 0x00 0x7F  <*> int8 <?> "running status")
+runningStatus = RunningStatus <$> brange 0x00 0x7F  <*> int8 <?> "running status"
+-- runningStatus = log "running status" <$> ( RunningStatus <$> brange 0x00 0x7F  <*> int8 <?> "running status")
 
 -- result builder
 
@@ -417,13 +428,14 @@ makeTuple : a -> b -> (a,b)
 makeTuple a b = (a,b)
 
 
-{- Experimental and not working how I want it: expect a value matching the supplied function -}
+{- Experimental and not working how I want it: expect a value matching the supplied function 
 expect : (a -> Bool) -> Parser a -> Parser a
 expect f p = p `andThen` 
           (\b -> case f b of
             True -> succeed b
             _ -> fail [ "unexpected:" ++ toString b ]
           )
+-}
 
 -- translation of Running Status messages to NoteOn/NoteOff etc
 
@@ -488,10 +500,10 @@ parse : String -> Result.Result String MidiRecording
 parse s =
   case Combine.parse midi s of 
   -- case Combine.parse (midi <* end) s of
-    (Done n, _) ->
+    (Ok n, _) ->
       Ok n
 
-    (Fail ms, cx) ->
+    (Err ms, cx) ->
       Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString cx))
 
 
