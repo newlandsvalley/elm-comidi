@@ -37,7 +37,7 @@ Limitations
 
 Type-2 has not yet been tested.
 
-The examples use the XmlHttpRequest _overrideMimeType_ hack with a charset value of _x-user-defined_ in order to be able to channel binary data through the request as if it were text.  The _normalise_ function in elm-comidi is used to make sense of the returned data before parsing. 
+The examples use the XmlHttpRequest _overrideMimeType_ hack with a charset value of _x-user-defined_ in order to be able to channel binary data through the response as if it were text.  The _normalise_ function in elm-comidi is used to make sense of the returned data before parsing. 
 
 Running Status messages are supported and placed in the parse tree as such.  A function 'translateRunningStatus' can be used after parsing to convert them into the appropriate NoteOn/NoteOff etc. message. It would perhaps be better if they were immediately translated by the parser into the appropriate channel voice message.  
  
