@@ -24,8 +24,8 @@ This version is intended to be a fully conformant parser which is happy with Typ
 Dependencies
 ------------
 
-*  Bogdanp/elm-combine  2.0.0
-*  elm-lang/core 3.0.0
+*  Bogdanp/elm-combine  2.2.1
+*  elm-lang/core 4.0.0
 
 Examples
 --------
