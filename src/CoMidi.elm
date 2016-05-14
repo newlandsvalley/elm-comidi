@@ -1,4 +1,4 @@
-module CoMidi
+module CoMidi exposing
     ( Track
     , Header
     , MidiEvent(..)
@@ -7,7 +7,7 @@ module CoMidi
     , normalise
     , parse
     , translateRunningStatus
-    ) where
+    ) 
 
 {-|  Library for parsing MIDI file contents using parser combinators,
 
