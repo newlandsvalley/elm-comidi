@@ -1,5 +1,5 @@
 {
-    "version": "2.0.0",
+    "version": "2.1.0",
     "summary": "Experimental library for parsing MIDI files",
     "repository": "https://github.com/newlandsvalley/elm-comidi.git",
     "license": "BSD3",
@@ -7,7 +7,8 @@
         "src"
     ],
     "exposed-modules": [
-        "CoMidi"
+        "CoMidi",
+        "MidiTypes"
     ],
     "dependencies": {
         "Bogdanp/elm-combine": "2.2.1 <= v < 3.0.0",
