@@ -1,5 +1,5 @@
 {
-    "version": "1.0.3",
+    "version": "1.0.2",
     "summary": "Experimental library for parsing MIDI files",
     "repository": "https://github.com/newlandsvalley/elm-comidi.git",
     "license": "BSD3",
