@@ -8,7 +8,8 @@ import List exposing (..)
 import Maybe exposing (..)
 import String exposing (..)
 import Result exposing (Result)
-import CoMidi exposing (MidiRecording, normalise, parse)
+import CoMidi exposing (normalise, parse)
+import MidiTypes exposing (MidiRecording)
 
 
 -- MODEL
