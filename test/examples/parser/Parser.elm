@@ -108,6 +108,7 @@ view model =
     , button [ onClick (Load "midi/carolansreceipt.midi") ] [ text "Carolan's Receipt (type-1)" ]
     , button [ onClick (Load "midi/Galway-Hornpipe.midi") ] [ text "Galway Hornpipe (unspecified meta)" ]
     , button [ onClick (Load "midi/frost.midi") ] [ text "Frost is all over (running status)" ]
+    , button [ onClick (Load "midi/chordsample.midi") ] [ text "chord sample" ]
     , div [  ] [ text ("parse result: " ++ (viewParseResult model.recording)) ]
     ]
 
