@@ -5,11 +5,9 @@ module CoMidi
         , translateRunningStatus
         )
 
-{-| Library for parsing MIDI file contents using parser combinators,
+{-| Library for parsing MIDI files
 
-# Definition
-
-# Functions
+# API Reference
 @docs normalise, parse, translateRunningStatus
 
 -}
