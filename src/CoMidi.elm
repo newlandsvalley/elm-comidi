@@ -33,8 +33,7 @@ import MidiTypes exposing (..)
 
 int8 : Parser s Int
 int8 =
-    log "int8"
-        <$> (toCode <$> anyChar)
+    toCode <$> anyChar
 
 
 
@@ -105,8 +104,7 @@ int16 =
             -- shiftLeft a 8 + b
             shiftLeftBy 8 a + b
     in
-        log "int16"
-            <$> (toInt16 <$> int8 <*> int8)
+        toInt16 <$> int8 <*> int8
 
 
 int24 : Parser s Int
@@ -136,28 +134,16 @@ int32 =
 
 varInt : Parser s Int
 varInt =
-    log "varInt"
-        <$> (int8
-                >>= (\n ->
-                        if (topBitSet n) then
-                            ((+) ((clearTopBit >> shiftLeftSeven) n)) <$> varInt
-                        else
-                            succeed n
-                    )
+    int8
+        >>= (\n ->
+                if (topBitSet n) then
+                    ((+) ((clearTopBit >> shiftLeftSeven) n)) <$> varInt
+                else
+                    succeed n
             )
 
 
 
-{-
-   int8
-       `andThen`
-           (\n ->
-               if (topBitSet n) then
-                   ((+) ((clearTopBit >> shiftLeftSeven) n)) <$> varInt
-               else
-                   succeed n
-           )
--}
 {- just for debug purposes - consume the rest of the input -}
 
 
@@ -210,11 +196,7 @@ midiHeader =
 
 midiTracks : Header -> Parser s MidiRecording
 midiTracks h =
-    let
-        _ =
-            log "track count" h.trackCount
-    in
-        makeTuple h <$> count h.trackCount midiTrack <?> "midi tracks"
+    makeTuple h <$> count h.trackCount midiTrack <?> "midi tracks"
 
 
 
@@ -225,8 +207,7 @@ midiTracks h =
 
 midiTrack : Parser s Track
 midiTrack =
-    log "midiTrack"
-        <$> (string "MTrk" *> int32 *> many1 midiMessage <* trackEndMessage <?> "midi track")
+    string "MTrk" *> int32 *> many1 midiMessage <* trackEndMessage <?> "midi track"
 
 
 
@@ -312,17 +293,15 @@ parseCopyright =
 
 
 parseTrackName : Parser s MidiEvent
+parseTrackName =
+    TrackName <$> parseMetaString 0x03 <?> "track name"
 
 
 
 {-
    parseTrackName =
-       TrackName <$> parseMetaString 0x03 <?> "track name"
+       log "track name" <$> (TrackName <$> parseMetaString 0x03 <?> "track name")
 -}
-
-
-parseTrackName =
-    log "track name" <$> (TrackName <$> parseMetaString 0x03 <?> "track name")
 
 
 parseInstrumentName : Parser s MidiEvent
@@ -483,7 +462,7 @@ channelAfterTouch =
 
 pitchBend : Parser s MidiEvent
 pitchBend =
-    log "pitch bend" <$> (buildPitchBend <$> brange 0xE0 0xEF <*> int8 <*> int8 <?> "pitch bend")
+    buildPitchBend <$> brange 0xE0 0xEF <*> int8 <*> int8 <?> "pitch bend"
 
 
 
@@ -636,26 +615,8 @@ buildTimeSig nn dd cc bb =
 
 consumeOverspill : Parser s ( Int, a ) -> Int -> Parser s a
 consumeOverspill actual expected =
-    {-
-       actual
-           `andThen`
-               (\( cnt, rest ) ->
-                   map (\_ -> rest) <|
-                       skip <|
-                           count (cnt - expected) int8
-               )
-    -}
-    {-
-       actual
-           >>= (\( cnt, rest ) ->
-                   map (\_ -> rest) <|
-                       skip <|
-                           count (cnt - expected) int8
-               )
-    -}
     actual
-        |> andThen
-            (\( cnt, rest ) ->
+        >>= (\( cnt, rest ) ->
                 map (\_ -> rest) <|
                     skip <|
                         count (cnt - expected) int8
