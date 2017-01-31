@@ -23,7 +23,7 @@ so that these messages are translated to the underlying channel messages.
 On the other hand, you may merely need to parse MIDI events (such as note on or note off). This is more likely if you are connecting directly
 to a MIDI device and need to parse the stream of event messages as the instrument is played.  To do this, use:
 
-    MidiEvent
+    midiEvent
       |> parseMidiEvent
 
 
