@@ -2,6 +2,7 @@ module CoMidi
     exposing
         ( normalise
         , parse
+        , parseMidiEvent
         , translateRunningStatus
         )
 
@@ -219,17 +220,22 @@ midiMessage : Parser s MidiMessage
 midiMessage =
     (,)
         <$> varInt
-        <*> choice
-                [ metaEvent
-                , noteOn
-                , noteOff
-                , noteAfterTouch
-                , controlChange
-                , programChange
-                , channelAfterTouch
-                , pitchBend
-                , runningStatus
-                ]
+        <*> midiEvent
+
+
+midiEvent : Parser s MidiEvent
+midiEvent =
+    choice
+        [ metaEvent
+        , noteOn
+        , noteOff
+        , noteAfterTouch
+        , controlChange
+        , programChange
+        , channelAfterTouch
+        , pitchBend
+        , runningStatus
+        ]
         <?> "midi message"
 
 
@@ -737,6 +743,18 @@ translateAllRunningStatus =
 
 
 -- exported functions
+
+
+{-| Parse a MIDI event
+-}
+parseMidiEvent : String -> Result.Result String MidiEvent
+parseMidiEvent s =
+    case Combine.parse midiEvent s of
+        Ok ( _, _, n ) ->
+            Ok n
+
+        Err ( _, ctx, ms ) ->
+            Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString ctx))
 
 
 {-| entry point - Parse a normalised MIDI file image
