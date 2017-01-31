@@ -9,7 +9,7 @@ module CoMidi
 {-| Library for parsing MIDI files
 
 # API Reference
-@docs normalise, parse, translateRunningStatus
+@docs normalise, parse, parseMidiEvent, translateRunningStatus
 
 -}
 
