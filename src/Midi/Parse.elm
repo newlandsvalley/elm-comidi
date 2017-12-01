@@ -1,4 +1,4 @@
-module CoMidi
+module Midi.Parse
     exposing
         ( normalise
         , parse
@@ -26,7 +26,7 @@ import String exposing (fromList, toList)
 import Debug exposing (..)
 import Maybe exposing (withDefault)
 import Tuple exposing (first, second)
-import MidiTypes exposing (..)
+import Midi.Types exposing (..)
 
 
 -- low level parsers

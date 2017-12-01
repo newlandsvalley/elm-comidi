@@ -13,8 +13,8 @@ import String exposing (..)
 import Result exposing (..)
 import BinaryFileIO.Ports exposing (..)
 import Json.Decode as Json exposing (..)
-import CoMidi exposing (normalise, parse)
-import MidiTypes exposing (MidiRecording)
+import Midi.Parse exposing (normalise, parse)
+import Midi.Types exposing (MidiRecording)
 import Debug exposing (..)
 
 
