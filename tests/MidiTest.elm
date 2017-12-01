@@ -29,6 +29,11 @@ fuzzPositiveVelocity =
     intRange 1 127
 
 
+fuzzControllerNumber : Fuzzer Int
+fuzzControllerNumber =
+    intRange 0 119
+
+
 fuzzNoteOn : Fuzzer MidiEvent
 fuzzNoteOn =
     Fuzz.map3 NoteOn fuzzChannel fuzzNote fuzzPositiveVelocity
@@ -44,10 +49,30 @@ fuzzNoteAfterTouch =
     Fuzz.map3 NoteAfterTouch fuzzChannel fuzzNote fuzzVelocity
 
 
+fuzzControlChange : Fuzzer MidiEvent
+fuzzControlChange =
+    Fuzz.map3 ControlChange fuzzChannel fuzzControllerNumber fuzzVelocity
+
+
+fuzzProgramChange : Fuzzer MidiEvent
+fuzzProgramChange =
+    Fuzz.map2 ProgramChange fuzzChannel fuzzVelocity
+
+
+fuzzChannelAfterTouch : Fuzzer MidiEvent
+fuzzChannelAfterTouch =
+    Fuzz.map2 ChannelAfterTouch fuzzChannel fuzzVelocity
+
+
 fuzzMidiEvent : Fuzzer MidiEvent
 fuzzMidiEvent =
     Fuzz.oneOf
-        [ fuzzNoteOn, fuzzNoteOff, fuzzNoteAfterTouch ]
+        [ fuzzNoteOn
+        , fuzzNoteOff
+        , fuzzNoteAfterTouch
+        , fuzzControlChange
+        , fuzzProgramChange
+        ]
 
 
 toByteString : List Int -> String
