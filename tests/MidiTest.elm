@@ -64,6 +64,11 @@ fuzzChannelAfterTouch =
     Fuzz.map2 ChannelAfterTouch fuzzChannel fuzzVelocity
 
 
+fuzzPitchBend : Fuzzer MidiEvent
+fuzzPitchBend =
+    Fuzz.map2 PitchBend fuzzChannel (intRange 0 16383)
+
+
 fuzzMidiEvent : Fuzzer MidiEvent
 fuzzMidiEvent =
     Fuzz.oneOf
@@ -72,6 +77,7 @@ fuzzMidiEvent =
         , fuzzNoteAfterTouch
         , fuzzControlChange
         , fuzzProgramChange
+        , fuzzPitchBend
         ]
 
 
@@ -88,4 +94,21 @@ suite =
                 Expect.equal
                     (Ok event)
                     (parseMidiEvent (toByteString (Generate.event event)))
+        , fuzz
+            (Fuzz.tuple
+                ( fuzzChannel, fuzzNote )
+            )
+            "NoteOn with velocity zero looks like NoteOff with velocity zero."
+          <|
+            \( channel, note ) ->
+                let
+                    noteOn =
+                        NoteOn channel note 0
+
+                    noteOff =
+                        NoteOff channel note 0
+                in
+                    Expect.equal
+                        (parseMidiEvent (toByteString (Generate.event noteOn)))
+                        (parseMidiEvent (toByteString (Generate.event noteOff)))
         ]
