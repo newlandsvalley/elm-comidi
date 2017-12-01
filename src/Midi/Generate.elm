@@ -9,6 +9,7 @@ module Midi.Generate exposing (event, recording)
 
 -}
 
+import Bitwise
 import Midi.Types exposing (..)
 
 
@@ -36,6 +37,16 @@ event event =
 
         ChannelAfterTouch channel velocity ->
             [ 208 + channel, velocity ]
+
+        PitchBend channel bend ->
+            let
+                lower =
+                    Bitwise.and bend 127
+
+                upper =
+                    Bitwise.shiftRightBy 7 bend
+            in
+                [ 224 + channel, lower, upper ]
 
         _ ->
             Debug.crash "TODO"
