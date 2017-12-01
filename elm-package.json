@@ -7,7 +7,7 @@
         "src"
     ],
     "exposed-modules": [
-        "Midi",
+        "Midi"
     ],
     "dependencies": {
         "Bogdanp/elm-combine": "3.1.1 <= v < 4.0.0",
