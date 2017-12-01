@@ -9,3 +9,6 @@ clean:
 
 format:
 	elm-format src/ examples/
+
+test:
+	elm-test

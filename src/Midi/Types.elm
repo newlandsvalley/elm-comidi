@@ -6,6 +6,9 @@ module Midi.Types
         , MidiMessage
         , MidiRecording
         , Byte
+        , Channel
+        , Note
+        , Velocity
         )
 
 {-| Type Definition of a MIDI recording
@@ -23,9 +26,21 @@ type alias Ticks =
 
 
 {-| just a hint that we're really interested in the bytes
-in some MidiEvent constructores that return Lists
+in some MidiEvent constructors that return Lists
 -}
 type alias Byte =
+    Int
+
+
+type alias Channel =
+    Int
+
+
+type alias Note =
+    Int
+
+
+type alias Velocity =
     Int
 
 
@@ -54,8 +69,8 @@ type MidiEvent
     | SysEx (List Byte)
     | Unspecified Int (List Byte)
       -- channel messages
-    | NoteOn Int Int Int
-    | NoteOff Int Int Int
+    | NoteOn Channel Note Velocity
+    | NoteOff Channel Note Velocity
     | NoteAfterTouch Int Int Int
     | ControlChange Int Int Int
     | ProgramChange Int Int
