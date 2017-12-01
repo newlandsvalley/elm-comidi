@@ -20,10 +20,13 @@ event : MidiEvent -> List Byte
 event event =
     case event of
         NoteOn channel note velocity ->
-            [ 128 + 16 + channel, note, velocity ]
+            [ 144 + channel, note, velocity ]
 
         NoteOff channel note velocity ->
             [ 128 + channel, note, velocity ]
+
+        NoteAfterTouch channel note velocity ->
+            [ 160 + channel, note, velocity ]
 
         _ ->
             Debug.crash "TODO"
