@@ -8,7 +8,9 @@ module CoMidi
 
 {-| Library for parsing MIDI files
 
+
 # API Reference
+
 @docs normalise, parse, parseMidiEvent, translateRunningStatus
 
 -}
@@ -280,8 +282,7 @@ parseMetaString : Int -> Parser s String
 parseMetaString target =
     String.fromList
         -- <$> (bchar target *> varInt `andThen` (\l -> count l anyChar))
-        <$>
-            (bchar target *> varInt >>= (\l -> count l anyChar))
+        <$> (bchar target *> varInt >>= (\l -> count l anyChar))
 
 
 parseText : Parser s MidiEvent

@@ -9,8 +9,10 @@ module MidiTypes
 
 {-| Type Definition of a MIDI recording
 
+
 # Data Types
-@docs Header, Track, MidiEvent, MidiMessage,  MidiRecording
+
+@docs Header, Track, MidiEvent, MidiMessage, MidiRecording
 
 -}
 
