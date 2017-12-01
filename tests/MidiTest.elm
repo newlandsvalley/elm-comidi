@@ -39,10 +39,15 @@ fuzzNoteOff =
     Fuzz.map3 NoteOff fuzzChannel fuzzNote fuzzVelocity
 
 
+fuzzNoteAfterTouch : Fuzzer MidiEvent
+fuzzNoteAfterTouch =
+    Fuzz.map3 NoteAfterTouch fuzzChannel fuzzNote fuzzVelocity
+
+
 fuzzMidiEvent : Fuzzer MidiEvent
 fuzzMidiEvent =
     Fuzz.oneOf
-        [ fuzzNoteOn, fuzzNoteOff ]
+        [ fuzzNoteOn, fuzzNoteOff, fuzzNoteAfterTouch ]
 
 
 toByteString : List Int -> String
