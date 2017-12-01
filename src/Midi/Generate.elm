@@ -28,6 +28,15 @@ event event =
         NoteAfterTouch channel note velocity ->
             [ 160 + channel, note, velocity ]
 
+        ControlChange channel controllerNumber value ->
+            [ 176 + channel, controllerNumber, value ]
+
+        ProgramChange channel value ->
+            [ 192 + channel, value ]
+
+        ChannelAfterTouch channel velocity ->
+            [ 208 + channel, velocity ]
+
         _ ->
             Debug.crash "TODO"
 
