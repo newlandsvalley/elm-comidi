@@ -1,4 +1,4 @@
-module MidiTypes
+module Midi.Types
     exposing
         ( Track
         , Header
