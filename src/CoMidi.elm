@@ -222,14 +222,23 @@ midiMessage : Parser s MidiMessage
 midiMessage =
     (,)
         <$> varInt
-        <*> midiEvent
+        <*> generalEvent
+
+
+generalEvent : Parser s MidiEvent
+generalEvent =
+    choice
+        [ metaEvent
+        , midiEvent
+        , parseSysEx
+        ]
+        <?> "general event"
 
 
 midiEvent : Parser s MidiEvent
 midiEvent =
     choice
-        [ metaEvent
-        , noteOn
+        [ noteOn
         , noteOff
         , noteAfterTouch
         , controlChange
@@ -238,7 +247,7 @@ midiEvent =
         , pitchBend
         , runningStatus
         ]
-        <?> "midi message"
+        <?> "midi event"
 
 
 
@@ -263,7 +272,6 @@ metaEvent =
             , parseTimeSignature
             , parseKeySignature
             , parseSequencerSpecific
-            , parseSysEx
             , parseUnspecified
             ]
         <?> "meta event"
@@ -282,7 +290,8 @@ parseMetaString : Int -> Parser s String
 parseMetaString target =
     String.fromList
         -- <$> (bchar target *> varInt `andThen` (\l -> count l anyChar))
-        <$> (bchar target *> varInt >>= (\l -> count l anyChar))
+        <$>
+            (bchar target *> varInt >>= (\l -> count l anyChar))
 
 
 parseText : Parser s MidiEvent
