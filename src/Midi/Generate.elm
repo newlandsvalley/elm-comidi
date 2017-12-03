@@ -10,16 +10,16 @@ module Midi.Generate exposing (event, recording)
 -}
 
 import Bitwise
+import Char
 import Midi.Types exposing (..)
-
-
-type alias Byte =
-    Int
 
 
 event : MidiEvent -> List Byte
 event event =
     case event of
+        SysEx bytes ->
+            0xF0 :: (bytes ++ [ 0xF7 ])
+
         NoteOn channel note velocity ->
             [ 144 + channel, note, velocity ]
 
