@@ -1,4 +1,4 @@
-module Midi.Generate exposing (event, recording)
+module Midi.Generate exposing (event, events, recording)
 
 {-| Library for encoding MIDI types as "binary"
 
@@ -50,6 +50,16 @@ event event =
 
         _ ->
             Debug.crash "TODO"
+
+
+
+-- TODO(rofer): events should later automatically use Running Status where
+-- possible
+
+
+events : List MidiEvent -> List Byte
+events events =
+    List.concatMap event events
 
 
 recording : MidiRecording -> List Byte
