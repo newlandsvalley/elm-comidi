@@ -222,23 +222,16 @@ midiMessage : Parser s MidiMessage
 midiMessage =
     (,)
         <$> varInt
-        <*> generalEvent
-
-
-generalEvent : Parser s MidiEvent
-generalEvent =
-    choice
-        [ metaEvent
-        , midiEvent
-        , parseSysEx
-        ]
-        <?> "general event"
+        <*> midiEvent
+        <?> "midi message"
 
 
 midiEvent : Parser s MidiEvent
 midiEvent =
     choice
-        [ noteOn
+        [ metaEvent
+        , sysExEvent
+        , noteOn
         , noteOff
         , noteAfterTouch
         , controlChange
@@ -386,10 +379,16 @@ parseSequencerSpecific =
     SequencerSpecific <$> parseMetaString 0x7F <?> "sequencer specific"
 
 
-parseSysEx : Parser s MidiEvent
-parseSysEx =
-    -- SysEx <$> (String.fromList <$> (bchoice 0xF0 0xF7 *> varInt `andThen` (\l -> count l anyChar))) <?> "system exclusive"
-    SysEx <$> (String.fromList <$> (bchoice 0xF0 0xF7 *> varInt >>= (\l -> count l anyChar))) <?> "system exclusive"
+
+{- a SysEx event may be introduced by either 0xF0 or 0XF7 and is followed by a
+   counted array of bytes.  F7 packets may include an embedded F0 packet but
+   this parser treats an embedded packet simply as opaque data.
+-}
+
+
+sysExEvent : Parser s MidiEvent
+sysExEvent =
+    SysEx <$> (List.map toCode <$> (bchoice 0xF0 0xF7 *> varInt >>= (\l -> count l anyChar))) <?> "system exclusive"
 
 
 

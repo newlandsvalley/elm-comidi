@@ -39,7 +39,7 @@ type MidiEvent
     | TimeSignature Int Int Int Int
     | KeySignature Int Int
     | SequencerSpecific String
-    | SysEx String
+    | SysEx (List Int)
     | Unspecified Int (List Int)
       -- channel messages
     | NoteOn Int Int Int
