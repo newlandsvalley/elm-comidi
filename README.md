@@ -11,23 +11,16 @@ To parse a MIDI string that represents a recording you can use:
       |> normalise
       |> parse
 
-or, if the MIDI uses running status messages:
+This attempts to parse the contents and also translates running status messages to the appropriate underlying channel message (note on, note off, aftertouch etc.).
 
-    midi
-      |> normalise
-      |> parse
-      |> translateRunningStatus
-
-so that these messages are translated to the underlying channel messages.
-
-On the other hand, you may merely need to parse MIDI events (such as note on or note off). This is more likely if you are connecting directly
-to a MIDI device and need to parse the stream of event messages as the instrument is played.  To do this, use:
+On the other hand, you may merely need to parse MIDI events (such as note on or note off) that emanate from a Web MIDI connection. In other words, you are connecting directly to a MIDI device through the browser and need to parse the stream of event messages as the instrument is played.  To do this, use:
 
     midiEvent
       |> parseMidiEvent
 
+This will attempt to parse an individual event.  It works for all events other than System Exclusive events (these have a different format within a MIDI file from that in a stream). Note that Web MIDI does not generate running status messages.
 
-This version is intended to be a fully conformant parser which is happy with Type-0, Type-1 and Type-2 files.
+The parser is intended to be a fully conformant, happy with Type-0, Type-1 and Type-2 files.
 
 Dependencies
 ------------

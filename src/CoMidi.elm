@@ -3,7 +3,6 @@ module CoMidi
         ( normalise
         , parse
         , parseMidiEvent
-        , translateRunningStatus
         )
 
 {-| Library for parsing MIDI files
@@ -11,8 +10,7 @@ module CoMidi
 
 # API Reference
 
-@docs normalise, parse, parseMidiEvent, translateRunningStatus
-
+@docs normalise, parse, parseMidiEvent
 -}
 
 import Combine exposing (..)
@@ -203,31 +201,58 @@ midiTracks h =
 
 
 
-{- we don't place TrackEnd events into the parse tree - there is no need.
-   The end of the track is implied by the end of the event list
+{- we pass Nothing to midiMessages because the very first message
+   has no parent (antecedent)
 -}
 
 
 midiTrack : Parser s Track
 midiTrack =
-    string "MTrk" *> int32 *> many1 midiMessage <* trackEndMessage <?> "midi track"
+    string "MTrk" *> int32 *> midiMessages Nothing <?> "midi track"
+
+
+midiMessages : Maybe MidiEvent -> Parser s (List MidiMessage)
+midiMessages parent =
+    midiMessage parent
+        >>= moreMessageOrEnd
+
+
+moreMessageOrEnd : MidiMessage -> Parser s (List MidiMessage)
+moreMessageOrEnd lastMessage =
+    ((::) lastMessage)
+        <$> choice
+                [ endOfMessages
+                , midiMessages (Just (second lastMessage))
+                ]
 
 
 
--- midiTrack = string "MTrk" *> int32 *> manyTill midiMessage trackEndMessage  <?> "midi track"
--- Note - it is important that runningStatus is placed last because of its catch-all definition
+{- we don't place TrackEnd events into the parse tree - there is no need.
+   The end of the track is implied by the end of the event list
+-}
 
 
-midiMessage : Parser s MidiMessage
-midiMessage =
+endOfMessages : Parser s (List MidiMessage)
+endOfMessages =
+    [] <$ trackEndMessage
+
+
+midiMessage : Maybe MidiEvent -> Parser s MidiMessage
+midiMessage parent =
     (,)
         <$> varInt
-        <*> midiEvent
+        <*> midiEvent parent
         <?> "midi message"
 
 
-midiEvent : Parser s MidiEvent
-midiEvent =
+
+{- we need to pass the parent event to running status events in order to
+   make sense of them.
+-}
+
+
+midiEvent : Maybe MidiEvent -> Parser s MidiEvent
+midiEvent parent =
     choice
         [ metaEvent
         , sysExEvent
@@ -238,7 +263,7 @@ midiEvent =
         , programChange
         , channelAfterTouch
         , pitchBend
-        , runningStatus
+        , runningStatus parent
         ]
         <?> "midi event"
 
@@ -481,14 +506,43 @@ pitchBend =
 
 
 
-{- running status is somewhat anomalous.  It inherits the 'type' of the last event parsed, which must be a channel event.
-   This inherited channel event type is not put into the parse tree - this is left to an interpreter
+{- running status is somewhat anomalous.  It inherits the 'type' of the last event parsed,
+   (here called the parent) which must be a channel event.
+   We now macro-expand the running status message to be the type (and use the channel status)
+   of the parent.  If the parent is missing or is not a channel event, we fail the parse
 -}
 
 
-runningStatus : Parser s MidiEvent
-runningStatus =
-    RunningStatus <$> brange 0x00 0x7F <*> int8 <?> "running status"
+runningStatus : Maybe MidiEvent -> Parser s MidiEvent
+runningStatus parent =
+    -- RunningStatus <$> brange 0x00 0x7F <*> int8 <?> "running status"
+    case parent of
+        Just (NoteOn status _ _) ->
+            (NoteOn status) <$> int8 <*> int8 <?> "note on running status"
+
+        Just (NoteOff status _ _) ->
+            (NoteOff status) <$> int8 <*> int8 <?> "note off running status"
+
+        Just (NoteAfterTouch status _ _) ->
+            (NoteAfterTouch status) <$> int8 <*> int8 <?> "note aftertouch running status"
+
+        Just (ControlChange status _ _) ->
+            (ControlChange status) <$> int8 <*> int8 <?> "control change running status"
+
+        Just (ProgramChange status _) ->
+            (ProgramChange status) <$> int8 <?> "program change running status"
+
+        Just (ChannelAfterTouch status _) ->
+            (ChannelAfterTouch status) <$> int8 <?> "channel aftertouch running status"
+
+        Just (PitchBend status _) ->
+            (PitchBend status) <$> int8 <?> "pitch bend running status"
+
+        Just _ ->
+            fail "inappropriate parent for running status"
+
+        _ ->
+            fail "no parent for running status"
 
 
 
@@ -677,80 +731,6 @@ makeTuple a b =
    the message to that of the saved state (but using the parameters from the Running Status)
    Otherwise, if not a Running Status event, just keep hold of the event unchanged.
 -}
-
-
-translateNextEvent : MidiMessage -> ( MidiEvent, List MidiMessage ) -> ( MidiEvent, List MidiMessage )
-translateNextEvent nextMessage acc =
-    let
-        ( state, events ) =
-            acc
-
-        ( ticks, next ) =
-            nextMessage
-    in
-        case next of
-            RunningStatus x y ->
-                let
-                    translatedStatus =
-                        interpretRS state x y
-                in
-                    case translatedStatus of
-                        Unspecified _ _ ->
-                            -- couldn't translate the running status so drop it
-                            ( state, events )
-
-                        _ ->
-                            -- could translate the running status so adopt it
-                            ( state, ( ticks, translatedStatus ) :: events )
-
-            other ->
-                ( other, nextMessage :: events )
-
-
-
--- just update the state
-{- we can interpret the running status if we have a legitimate last event state which is a channel voice event -}
-
-
-interpretRS : MidiEvent -> Int -> Int -> MidiEvent
-interpretRS last x y =
-    case last of
-        NoteOn chan _ _ ->
-            if (y == 0) then
-                NoteOff chan x y
-            else
-                NoteOn chan x y
-
-        NoteOff chan _ _ ->
-            NoteOff chan x y
-
-        NoteAfterTouch chan _ _ ->
-            NoteAfterTouch chan x y
-
-        ControlChange chan _ _ ->
-            ControlChange chan x y
-
-        ProgramChange _ _ ->
-            ProgramChange x y
-
-        ChannelAfterTouch _ _ ->
-            ChannelAfterTouch x y
-
-        PitchBend _ _ ->
-            PitchBend x y
-
-        _ ->
-            Unspecified 0 []
-
-
-translateAllRunningStatus : Track -> Track
-translateAllRunningStatus =
-    List.foldl translateNextEvent ( Unspecified 0 [], [] )
-        >> second
-        >> List.reverse
-
-
-
 -- exported functions
 
 
@@ -758,7 +738,7 @@ translateAllRunningStatus =
 -}
 parseMidiEvent : String -> Result.Result String MidiEvent
 parseMidiEvent s =
-    case Combine.parse midiEvent s of
+    case Combine.parse (midiEvent Nothing) s of
         Ok ( _, _, n ) ->
             Ok n
 
@@ -791,22 +771,3 @@ normalise =
             toCode >> ((and) 0xFF) >> fromCode
     in
         String.toList >> List.map f >> String.fromList
-
-
-{-| translate the Running Status messages in each track to the expanded form (NoteOn/NoteOff etc)
--}
-translateRunningStatus : Result.Result String MidiRecording -> Result.Result String MidiRecording
-translateRunningStatus res =
-    case res of
-        Ok mr ->
-            let
-                header =
-                    first mr
-
-                tracks =
-                    second mr |> List.map translateAllRunningStatus
-            in
-                Ok ( header, tracks )
-
-        err ->
-            err
