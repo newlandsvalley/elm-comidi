@@ -22,6 +22,9 @@ type alias Ticks =
 
 
 {-| Midi Event
+
+  Note that RunningStatus messages are not included within MidiEvent
+  because the parser translates them to the underlying channel messages
 -}
 type MidiEvent
     = -- meta messages
@@ -49,7 +52,10 @@ type MidiEvent
     | ProgramChange Int Int
     | ChannelAfterTouch Int Int
     | PitchBend Int Int
-    | RunningStatus Int Int
+
+
+
+-- | RunningStatus Int Int
 
 
 {-| Midi Message

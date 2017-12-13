@@ -515,7 +515,6 @@ pitchBend =
 
 runningStatus : Maybe MidiEvent -> Parser s MidiEvent
 runningStatus parent =
-    -- RunningStatus <$> brange 0x00 0x7F <*> int8 <?> "running status"
     case parent of
         Just (NoteOn status _ _) ->
             (NoteOn status) <$> int8 <*> int8 <?> "note on running status"
@@ -543,14 +542,6 @@ runningStatus parent =
 
         _ ->
             fail "no parent for running status"
-
-
-
--- runningStatus = log "running status" <$> ( RunningStatus <$> brange 0x00 0x7F  <*> int8 <?> "running status")
--- result builder
-{- build a Header and make the chunk length available so that any overspill bytes can
-   later be quietly ignored
--}
 
 
 headerChunk : Int -> Int -> Int -> Int -> ( Int, Header )
@@ -723,13 +714,6 @@ makeTuple a b =
                True -> succeed b
                _ -> fail [ "unexpected:" ++ toString b ]
              )
--}
--- translation of Running Status messages to NoteOn/NoteOff etc
-{- Translate the next message in a track if it has a Running Status event.
-   Keep track of state - the event that first kicks of sequence of Running Status events.
-   If the incoming event happens in the context of channel voice message state, then translate
-   the message to that of the saved state (but using the parameters from the Running Status)
-   Otherwise, if not a Running Status event, just keep hold of the event unchanged.
 -}
 -- exported functions
 
