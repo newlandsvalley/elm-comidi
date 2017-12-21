@@ -312,6 +312,16 @@ parseMetaString target =
             (bchar target *> varInt >>= (\l -> count l anyChar))
 
 
+
+{- parse a meta event valued as a List of Bytes (masquerading as Ints) -}
+
+
+parseMetaBytes : Int -> Parser s (List Byte)
+parseMetaBytes target =
+    List.map toCode
+        <$> (bchar target *> varInt >>= (\l -> count l anyChar))
+
+
 parseText : Parser s MidiEvent
 parseText =
     Text <$> parseMetaString 0x01 <?> "text"
@@ -401,7 +411,7 @@ parseKeySignature =
 
 parseSequencerSpecific : Parser s MidiEvent
 parseSequencerSpecific =
-    SequencerSpecific <$> parseMetaString 0x7F <?> "sequencer specific"
+    SequencerSpecific <$> parseMetaBytes 0x7F <?> "sequencer specific"
 
 
 

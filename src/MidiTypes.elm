@@ -5,6 +5,7 @@ module MidiTypes
         , MidiEvent(..)
         , MidiMessage
         , MidiRecording
+        , Byte
         )
 
 {-| Type Definition of a MIDI recording
@@ -18,6 +19,13 @@ module MidiTypes
 
 
 type alias Ticks =
+    Int
+
+
+{-| just a hint that we're really interested in the bytes
+    in some MidiEvent constructores that return Lists
+-}
+type alias Byte =
     Int
 
 
@@ -41,9 +49,9 @@ type MidiEvent
     | SMPTEOffset Int Int Int Int Int
     | TimeSignature Int Int Int Int
     | KeySignature Int Int
-    | SequencerSpecific String
-    | SysEx (List Int)
-    | Unspecified Int (List Int)
+    | SequencerSpecific (List Byte)
+    | SysEx (List Byte)
+    | Unspecified Int (List Byte)
       -- channel messages
     | NoteOn Int Int Int
     | NoteOff Int Int Int
