@@ -406,7 +406,7 @@ sysExEvent =
         notEox c =
             toCode c /= 0xF7
     in
-        SysEx F0
+        (\bytes -> SysEx F0 (bytes ++ [ 0xF7 ]))
             <$> (List.map toCode
                     <$> (String.toList <$> (bchar 0xF0 *> while notEox))
                 )

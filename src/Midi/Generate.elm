@@ -18,10 +18,10 @@ event : MidiEvent -> List Byte
 event event =
     case event of
         SysEx F0 bytes ->
-            0xF0 :: (bytes ++ [ 0xF7 ])
+            0xF0 :: bytes
 
         SysEx F7 bytes ->
-            bytes ++ [ 0xF7 ]
+            bytes
 
         NoteOn channel note velocity ->
             [ 0x90 + channel, note, velocity ]
@@ -81,7 +81,33 @@ header h =
 
 track : Track -> List Byte
 track t =
-    strToBytes "MTrk"
+    let
+        encodedMsgs =
+            List.concatMap midiMessage t
+
+        len =
+            List.length encodedMsgs
+    in
+        (strToBytes "MTrk") ++ uint32 len ++ encodedMsgs
+
+
+midiMessage : MidiMessage -> List Byte
+midiMessage ( ticks, e ) =
+    (varInt ticks) ++ fileEvent e
+
+
+fileEvent : MidiEvent -> List Byte
+fileEvent e =
+    case e of
+        SysEx F0 bytes ->
+            0xF0 :: ((varInt (List.length bytes)) ++ bytes)
+
+        SysEx F7 bytes ->
+            0xF7 :: ((varInt (List.length bytes)) ++ bytes)
+
+        _ ->
+            -- Use the regular event generator for everything else
+            event e
 
 
 
@@ -109,3 +135,17 @@ uint32 x =
             Bitwise.and 255 (shiftRightBy 24 x)
     in
         [ b1, b2, b3, b4 ]
+
+
+varInt : Int -> List Byte
+varInt x =
+    let
+        varIntHelper x bytes =
+            varIntHelper
+                (shiftRightBy 7 x)
+                ((Bitwise.and 255 x) :: bytes)
+    in
+        if x < 128 then
+            [ x ]
+        else
+            varIntHelper x []
