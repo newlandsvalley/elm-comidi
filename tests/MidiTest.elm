@@ -92,8 +92,8 @@ nonEmptyList fuzzer =
 fuzzSysExEvent : Fuzzer MidiEvent
 fuzzSysExEvent =
     Fuzz.map
-        (SysEx F0)
-        (nonEmptyList fuzzSysExByte)
+        (\xs -> SysEx F0 (xs ++ [ 0xF7 ]))
+        (Fuzz.list fuzzSysExByte)
 
 
 fuzzMidiEvent : Fuzzer MidiEvent
