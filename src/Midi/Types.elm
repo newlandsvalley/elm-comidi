@@ -9,6 +9,7 @@ module Midi.Types
         , Channel
         , Note
         , Velocity
+        , SysExFlavour(..)
         )
 
 {-| Type Definition of a MIDI recording
@@ -50,6 +51,11 @@ Note that RunningStatus messages are not included within MidiEvent
 because the parser translates them to the underlying channel messages
 
 -}
+type SysExFlavour
+    = F0 -- normal
+    | F7 -- escaped
+
+
 type MidiEvent
     = -- meta messages
       SequenceNumber Int
@@ -66,7 +72,7 @@ type MidiEvent
     | TimeSignature Int Int Int Int
     | KeySignature Int Int
     | SequencerSpecific (List Byte)
-    | SysEx (List Byte)
+    | SysEx SysExFlavour (List Byte)
     | Unspecified Int (List Byte)
       -- channel messages
     | NoteOn Channel Note Velocity

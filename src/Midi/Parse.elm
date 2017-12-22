@@ -11,6 +11,7 @@ module Midi.Parse
 # API Reference
 
 @docs normalise, parse, parseMidiEvent
+
 -}
 
 import Combine exposing (..)
@@ -241,7 +242,7 @@ midiMessage : Maybe MidiEvent -> Parser s MidiMessage
 midiMessage parent =
     (,)
         <$> varInt
-        <*> midiEvent parent
+        <*> midiFileEvent parent
         <?> "midi message"
 
 
@@ -256,6 +257,22 @@ midiEvent parent =
     choice
         [ metaEvent
         , sysExEvent
+        , noteOn
+        , noteOff
+        , noteAfterTouch
+        , controlChange
+        , programChange
+        , channelAfterTouch
+        , pitchBend
+        , runningStatus parent
+        ]
+        <?> "midi event"
+
+
+midiFileEvent : Maybe MidiEvent -> Parser s MidiEvent
+midiFileEvent parent =
+    choice
+        [ metaEvent
         , noteOn
         , noteOff
         , noteAfterTouch
@@ -308,8 +325,7 @@ parseMetaString : Int -> Parser s String
 parseMetaString target =
     String.fromList
         -- <$> (bchar target *> varInt `andThen` (\l -> count l anyChar))
-        <$>
-            (bchar target *> varInt >>= (\l -> count l anyChar))
+        <$> (bchar target *> varInt >>= (\l -> count l anyChar))
 
 
 
@@ -415,15 +431,23 @@ parseSequencerSpecific =
 
 
 
-{- a SysEx event may be introduced by either 0xF0 or 0XF7 and is followed by a
-   counted array of bytes.  F7 packets may include an embedded F0 packet but
-   this parser treats an embedded packet simply as opaque data.
+{- A SysEx event is introduced by an 0XF0 byte and is followed by an array of bytes.
+   In Web Midi a sysex event starts with a 0xF0 byte and ends with an EOX (0xF7) byte.
+   There are also escaped SysEx messages, but these are only found in MIDI files.
 -}
 
 
 sysExEvent : Parser s MidiEvent
 sysExEvent =
-    SysEx <$> (List.map toCode <$> (bchoice 0xF0 0xF7 *> varInt >>= (\l -> count l anyChar))) <?> "system exclusive"
+    let
+        notEox c =
+            toCode c /= 0xF7
+    in
+        SysEx F0
+            <$> (List.map toCode
+                    <$> (String.toList <$> (bchar 0xF0 *> while notEox))
+                )
+            <?> "system exclusive"
 
 
 
@@ -745,13 +769,9 @@ parseMidiEvent s =
 parse : String -> Result.Result String MidiRecording
 parse s =
     case Combine.parse midi s of
-        -- case Combine.parse (midi <* end) s of
-        -- ( Ok n, _ ) ->
         Ok ( _, _, n ) ->
             Ok n
 
-        -- ( Err ms, cx ) ->
-        --    Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString cx))
         Err ( _, ctx, ms ) ->
             Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString ctx))
 
