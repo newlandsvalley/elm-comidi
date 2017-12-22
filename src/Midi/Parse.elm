@@ -39,7 +39,6 @@ int8 =
 
 
 
--- int8 = log "int8" <$> (toCode <$> anyChar)
 {- parse a signed binary 8 bit integer -}
 
 
@@ -103,7 +102,6 @@ int16 : Parser s Int
 int16 =
     let
         toInt16 a b =
-            -- shiftLeft a 8 + b
             shiftLeftBy 8 a + b
     in
         toInt16 <$> int8 <*> int8
@@ -113,7 +111,6 @@ int24 : Parser s Int
 int24 =
     let
         toInt24 a b c =
-            -- shiftLeft a 16 + shiftLeft b 8 + c
             shiftLeftBy 16 a + shiftLeftBy 8 b + c
     in
         toInt24 <$> int8 <*> int8 <*> int8
@@ -123,7 +120,6 @@ int32 : Parser s Int
 int32 =
     let
         toInt32 a b c d =
-            -- shiftLeft a 24 + shiftLeft b 16 + shiftLeft c 8 + d
             shiftLeftBy 24 a + shiftLeftBy 16 b + shiftLeftBy 8 c + d
     in
         toInt32 <$> int8 <*> int8 <*> int8 <*> int8
@@ -160,28 +156,11 @@ rest =
 
 midi : Parser s MidiRecording
 midi =
-    -- midiHeader `andThen` midiTracks
-    -- midiHeader >>= midiTracks
     midiHeader
         |> andThen midiTracks
 
 
 
-{- this version of the top level parser just parses many tracks
-      without checking whether the track count agrees with the header
-   midi0 : Parser s MidiRecording
-   midi0 = (,) <$> midiHeader <*> midiTracks0
-
-   midiTracks0 : Parser s (List Track)
-   midiTracks0 = many1 midiTrack <?> "midi tracks"
--}
-{- simple parser for headers which assumes chunk size is 6
-   midiHeader : Parser Header
-   midiHeader = string "MThd"
-                  *> int32
-                  *> ( Header <$>  int16 <*> int16 <*> int16 )
-                  <?> "header"
--}
 {- parser for headers which quietly eats any extra bytes if we have a non-standard chunk size -}
 
 
@@ -379,10 +358,6 @@ parseMarker =
     Marker <$> parseMetaString 0x06 <?> "marker"
 
 
-
--- parseMarker = log "marker" <$> (Marker <$> parseMetaString 0x06 <?> "marker" )
-
-
 parseCuePoint : Parser s MidiEvent
 parseCuePoint =
     CuePoint <$> parseMetaString 0x07 <?> "cue point"
@@ -398,10 +373,6 @@ parseTempoChange =
     Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24) <?> "tempo change"
 
 
-
--- parseTempoChange = log "set tempo" <$> (Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24 ) <?> "tempo change")
-
-
 parseSMPTEOffset : Parser s MidiEvent
 parseSMPTEOffset =
     bchar 0x54 *> bchar 0x03 *> (SMPTEOffset <$> int8 <*> int8 <*> int8 <*> int8 <*> int8 <?> "SMTPE offset")
@@ -412,17 +383,9 @@ parseTimeSignature =
     bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8) <?> "time signature"
 
 
-
--- parseTimeSignature = log "time sig" <$> (bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8 ) <?> "time signature" )
-
-
 parseKeySignature : Parser s MidiEvent
 parseKeySignature =
     bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8)
-
-
-
--- parseKeySignature = log "key sig" <$>  (bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8))
 
 
 parseSequencerSpecific : Parser s MidiEvent
@@ -741,14 +704,6 @@ makeTuple a b =
 
 
 
-{- Experimental and not working how I want it: expect a value matching the supplied function
-   expect : (a -> Bool) -> Parser a -> Parser a
-   expect f p = p `andThen`
-             (\b -> case f b of
-               True -> succeed b
-               _ -> fail [ "unexpected:" ++ toString b ]
-             )
--}
 -- exported functions
 
 
