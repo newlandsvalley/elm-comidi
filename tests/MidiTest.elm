@@ -89,10 +89,10 @@ nonEmptyList fuzzer =
         (intRange 1 32)
 
 
-fuzzSysEx : Fuzzer MidiEvent
-fuzzSysEx =
+fuzzSysExEvent : Fuzzer MidiEvent
+fuzzSysExEvent =
     Fuzz.map
-        SysEx
+        (SysEx F0)
         (nonEmptyList fuzzSysExByte)
 
 
@@ -105,6 +105,7 @@ fuzzMidiEvent =
         , fuzzControlChange
         , fuzzProgramChange
         , fuzzPitchBend
+        , fuzzSysExEvent
         ]
 
 

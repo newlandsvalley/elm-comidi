@@ -17,8 +17,11 @@ import Midi.Types exposing (..)
 event : MidiEvent -> List Byte
 event event =
     case event of
-        SysEx bytes ->
+        SysEx F0 bytes ->
             0xF0 :: (bytes ++ [ 0xF7 ])
+
+        SysEx F7 bytes ->
+            bytes ++ [ 0xF7 ]
 
         NoteOn channel note velocity ->
             [ 0x90 + channel, note, velocity ]
