@@ -76,14 +76,23 @@ header h =
         division =
             h.ticksPerBeat
     in
-        (strToBytes "MThd") ++ [ 0, 0, 0x06, format, numTracks, division ]
+        List.concat
+            [ strToBytes "MThd"
+            , uint32 6
+            , uint16 format
+            , uint16 numTracks
+            , uint16 division
+            ]
 
 
 track : Track -> List Byte
 track t =
     let
+        endOfTrack =
+            [ 0x00, 0xFF, 0x2F, 0x00 ]
+
         encodedMsgs =
-            List.concatMap midiMessage t
+            (List.concatMap midiMessage t) ++ endOfTrack
 
         len =
             List.length encodedMsgs
@@ -119,20 +128,32 @@ strToBytes =
     (List.map Char.toCode) << String.toList
 
 
+uint16 : Int -> List Byte
+uint16 x =
+    let
+        b1 =
+            Bitwise.and 255 (shiftRightBy 8 x)
+
+        b2 =
+            Bitwise.and 255 x
+    in
+        [ b1, b2 ]
+
+
 uint32 : Int -> List Byte
 uint32 x =
     let
         b1 =
-            Bitwise.and 255 x
+            Bitwise.and 255 (shiftRightBy 24 x)
 
         b2 =
-            Bitwise.and 255 (shiftRightBy 8 x)
-
-        b3 =
             Bitwise.and 255 (shiftRightBy 16 x)
 
+        b3 =
+            Bitwise.and 255 (shiftRightBy 8 x)
+
         b4 =
-            Bitwise.and 255 (shiftRightBy 24 x)
+            Bitwise.and 255 x
     in
         [ b1, b2, b3, b4 ]
 
