@@ -109,6 +109,50 @@ fuzzMidiEvent =
         ]
 
 
+fuzzNumTracks : Fuzzer Int
+fuzzNumTracks =
+    Fuzz.frequency
+        [ ( 50, Fuzz.constant 1 )
+        , ( 30, intRange 2 8 )
+
+        --, ( 19, intRange 9 16 )
+        --, ( 1, intRange 17 255 )
+        ]
+
+
+fuzzMidiRecording : Fuzzer MidiRecording
+fuzzMidiRecording =
+    Fuzz.andThen
+        (\format ->
+            Fuzz.andThen
+                (\numTracks ->
+                    Fuzz.map2
+                        (\ticks ->
+                            \tracks ->
+                                ( { formatType = format
+                                  , trackCount = numTracks
+                                  , ticksPerBeat = ticks
+                                  }
+                                , tracks
+                                )
+                        )
+                        (intRange 1 0x7FFF)
+                        (listOfLength fuzzTrack numTracks)
+                )
+                (if format == 0 then
+                    Fuzz.constant 1
+                 else
+                    fuzzNumTracks
+                )
+        )
+        (intRange 0 2)
+
+
+fuzzTrack : Fuzzer Track
+fuzzTrack =
+    Fuzz.constant []
+
+
 toByteString : List Int -> String
 toByteString list =
     String.fromList (List.map Char.fromCode list)
@@ -117,11 +161,16 @@ toByteString list =
 suite : Test
 suite =
     describe "MIDI tests"
-        [ fuzz fuzzMidiEvent "Go from Elm type to \"Binary\" and back" <|
+        [ fuzz fuzzMidiEvent "Go from MidiEvent to \"Binary\" and back" <|
             \event ->
                 Expect.equal
                     (Ok event)
                     (parseMidiEvent (toByteString (Generate.event event)))
+        , fuzz fuzzMidiRecording "Go from MidiRecording to \"Binary\" and back" <|
+            \recording ->
+                Expect.equal
+                    (Ok recording)
+                    (parse (toByteString (Generate.recording recording)))
         , fuzz
             (Fuzz.tuple
                 ( fuzzChannel, fuzzNote )
