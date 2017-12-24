@@ -10,6 +10,7 @@ module Midi.Types
         , Note
         , Velocity
         , SysExFlavour(..)
+        , Ticks
         )
 
 {-| Type Definition of a MIDI recording

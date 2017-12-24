@@ -116,13 +116,13 @@ int24 =
         toInt24 <$> int8 <*> int8 <*> int8
 
 
-int32 : Parser s Int
-int32 =
+uint32 : Parser s Int
+uint32 =
     let
-        toInt32 a b c d =
+        toUint32 a b c d =
             shiftLeftBy 24 a + shiftLeftBy 16 b + shiftLeftBy 8 c + d
     in
-        toInt32 <$> int8 <*> int8 <*> int8 <*> int8
+        toUint32 <$> int8 <*> int8 <*> int8 <*> int8
 
 
 
@@ -169,7 +169,7 @@ midiHeader =
     string "MThd"
         *> let
             h =
-                headerChunk <$> int32 <*> int16 <*> int16 <*> int16
+                headerChunk <$> uint32 <*> int16 <*> int16 <*> int16
            in
             consumeOverspill h 6
                 <?> "header"
@@ -177,7 +177,7 @@ midiHeader =
 
 midiTracks : Header -> Parser s MidiRecording
 midiTracks h =
-    makeTuple h <$> count h.trackCount midiTrack <?> "midi tracks"
+    makeTuple h <$> count h.trackCount midiTrack <?> ("midi tracks (" ++ toString h.trackCount ++ ")")
 
 
 
@@ -188,36 +188,33 @@ midiTracks h =
 
 midiTrack : Parser s Track
 midiTrack =
-    string "MTrk" *> int32 *> midiMessages Nothing <?> "midi track"
+    string "MTrk" *> uint32 *> midiMessages Nothing <?> "midi track"
 
 
 midiMessages : Maybe MidiEvent -> Parser s (List MidiMessage)
 midiMessages parent =
     midiMessage parent
-        >>= moreMessageOrEnd
-
-
-moreMessageOrEnd : MidiMessage -> Parser s (List MidiMessage)
-moreMessageOrEnd lastMessage =
-    ((::) lastMessage)
-        <$> choice
-                [ endOfMessages
-                , midiMessages (Just (second lastMessage))
-                ]
+        >>= continueOrNot
 
 
 
-{- we don't place TrackEnd events into the parse tree - there is no need.
-   The end of the track is implied by the end of the event list
+{- Keep reading unless we just saw an End of Track message
+   which would cause us to get Nothing passed in here
 -}
 
 
-endOfMessages : Parser s (List MidiMessage)
-endOfMessages =
-    [] <$ trackEndMessage
+continueOrNot : ( Ticks, Maybe MidiEvent ) -> Parser s (List MidiMessage)
+continueOrNot maybeLastMessage =
+    case maybeLastMessage of
+        ( ticks, Just lastEvent ) ->
+            ((::) ( ticks, lastEvent ))
+                <$> midiMessages (Just lastEvent)
+
+        ( _, Nothing ) ->
+            succeed []
 
 
-midiMessage : Maybe MidiEvent -> Parser s MidiMessage
+midiMessage : Maybe MidiEvent -> Parser s ( Ticks, Maybe MidiEvent )
 midiMessage parent =
     (,)
         <$> varInt
@@ -243,23 +240,22 @@ midiEvent parent =
         , programChange
         , channelAfterTouch
         , pitchBend
-        , runningStatus parent
         ]
         <?> "midi event"
 
 
-midiFileEvent : Maybe MidiEvent -> Parser s MidiEvent
+midiFileEvent : Maybe MidiEvent -> Parser s (Maybe MidiEvent)
 midiFileEvent parent =
     choice
-        [ metaEvent
-        , noteOn
-        , noteOff
-        , noteAfterTouch
-        , controlChange
-        , programChange
-        , channelAfterTouch
-        , pitchBend
-        , runningStatus parent
+        [ metaFileEvent
+        , Just <$> noteOn
+        , Just <$> noteOff
+        , Just <$> noteAfterTouch
+        , Just <$> controlChange
+        , Just <$> programChange
+        , Just <$> channelAfterTouch
+        , Just <$> pitchBend
+        , Just <$> runningStatus parent
         ]
         <?> "midi event"
 
@@ -289,6 +285,35 @@ metaEvent =
             , parseUnspecified
             ]
         <?> "meta event"
+
+
+metaFileEvent : Parser s (Maybe MidiEvent)
+metaFileEvent =
+    bchar 0xFF
+        *> choice
+            [ Just <$> parseSequenceNumber
+            , Just <$> parseText
+            , Just <$> parseCopyright
+            , Just <$> parseTrackName
+            , Just <$> parseInstrumentName
+            , Just <$> parseLyrics
+            , Just <$> parseMarker
+            , Just <$> parseCuePoint
+            , Just <$> parseChannelPrefix
+            , Just <$> parseTempoChange
+            , Just <$> parseSMPTEOffset
+            , Just <$> parseTimeSignature
+            , Just <$> parseKeySignature
+            , Just <$> parseSequencerSpecific
+            , parseEndOfTrack
+            , Just <$> parseUnspecified
+            ]
+        <?> "meta event"
+
+
+parseEndOfTrack : Parser s (Maybe MidiEvent)
+parseEndOfTrack =
+    (bchar 0x2F *> bchar 0x00 *> (succeed Nothing) <?> "sequence number")
 
 
 parseSequenceNumber : Parser s MidiEvent
