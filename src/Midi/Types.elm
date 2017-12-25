@@ -101,7 +101,6 @@ type alias Track =
 -}
 type alias Header =
     { formatType : Int
-    , trackCount : Int
     , ticksPerBeat : Int
     }
 
