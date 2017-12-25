@@ -161,10 +161,26 @@ midi =
 
 
 
+{- an internal representation of the header which includes the track count -}
+
+
+type alias ParseHeader =
+    { formatType : Int
+    , trackCount : Int
+    , ticksPerBeat : Int
+    }
+
+
+toHeader : ParseHeader -> Header
+toHeader ph =
+    { formatType = ph.formatType, ticksPerBeat = ph.ticksPerBeat }
+
+
+
 {- parser for headers which quietly eats any extra bytes if we have a non-standard chunk size -}
 
 
-midiHeader : Parser s Header
+midiHeader : Parser s ParseHeader
 midiHeader =
     string "MThd"
         *> let
@@ -175,9 +191,9 @@ midiHeader =
                 <?> "header"
 
 
-midiTracks : Header -> Parser s MidiRecording
+midiTracks : ParseHeader -> Parser s MidiRecording
 midiTracks h =
-    makeTuple h <$> count h.trackCount midiTrack <?> ("midi tracks (" ++ toString h.trackCount ++ ")")
+    (\tracks -> ( toHeader h, tracks )) <$> count h.trackCount midiTrack <?> ("midi tracks (" ++ toString h.trackCount ++ ")")
 
 
 
@@ -566,9 +582,9 @@ runningStatus parent =
             fail "no parent for running status"
 
 
-headerChunk : Int -> Int -> Int -> Int -> ( Int, Header )
+headerChunk : Int -> Int -> Int -> Int -> ( Int, ParseHeader )
 headerChunk l a b c =
-    ( l, Header a b c )
+    ( l, ParseHeader a b c )
 
 
 

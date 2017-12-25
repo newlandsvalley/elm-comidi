@@ -57,21 +57,21 @@ event event =
 
 recording : MidiRecording -> List Byte
 recording ( h, tracks ) =
-    header h ++ (List.concatMap track tracks)
+    (header h (List.length tracks)) ++ (List.concatMap track tracks)
 
 
 
 -- Lower level generators
 
 
-header : Header -> List Byte
-header h =
+header : Header -> Int -> List Byte
+header h trackCount =
     let
         format =
             h.formatType
 
         numTracks =
-            h.trackCount
+            trackCount
 
         division =
             h.ticksPerBeat

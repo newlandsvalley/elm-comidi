@@ -130,7 +130,6 @@ fuzzMidiRecording =
                         (\ticks ->
                             \tracks ->
                                 ( { formatType = format
-                                  , trackCount = numTracks
                                   , ticksPerBeat = ticks
                                   }
                                 , tracks
