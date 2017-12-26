@@ -162,11 +162,14 @@ varInt : Int -> List Byte
 varInt x =
     let
         varIntHelper x bytes =
-            varIntHelper
-                (shiftRightBy 7 x)
-                ((Bitwise.and 255 x) :: bytes)
+            if x < 128 then
+                (x + 128) :: bytes
+            else
+                varIntHelper
+                    (shiftRightBy 7 x)
+                    ((128 + (Bitwise.and 127 x)) :: bytes)
     in
         if x < 128 then
             [ x ]
         else
-            varIntHelper x []
+            varIntHelper (shiftRightBy 7 x) [ Bitwise.and 127 x ]

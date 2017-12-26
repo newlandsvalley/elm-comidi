@@ -27,6 +27,7 @@ import Debug exposing (..)
 import Maybe exposing (withDefault)
 import Tuple exposing (first, second)
 import Midi.Types exposing (..)
+import Result exposing (Result)
 
 
 -- low level parsers
@@ -45,7 +46,7 @@ int8 =
 signedInt8 : Parser s Int
 signedInt8 =
     (\i ->
-        if (topBitSet i) then
+        if (i > 127) then
             i - 256
         else
             i
@@ -98,8 +99,8 @@ notTrackEnd =
 -- fixed length integers
 
 
-int16 : Parser s Int
-int16 =
+uint16 : Parser s Int
+uint16 =
     let
         toInt16 a b =
             shiftLeftBy 8 a + b
@@ -107,8 +108,8 @@ int16 =
         toInt16 <$> int8 <*> int8
 
 
-int24 : Parser s Int
-int24 =
+uint24 : Parser s Int
+uint24 =
     let
         toInt24 a b c =
             shiftLeftBy 16 a + shiftLeftBy 8 b + c
@@ -130,15 +131,20 @@ uint32 =
 -- (need to somehow check this for lengths above 16 bits)
 
 
-varInt : Parser s Int
-varInt =
+varIntHelper : Parser s (List Int)
+varIntHelper =
     int8
         >>= (\n ->
-                if (topBitSet n) then
-                    ((+) ((clearTopBit >> shiftLeftSeven) n)) <$> varInt
+                if (n < 128) then
+                    succeed [ n ]
                 else
-                    succeed n
+                    ((::) (and 127 n)) <$> varIntHelper
             )
+
+
+varInt : Parser s Int
+varInt =
+    List.foldl (\n -> \acc -> (shiftLeftBy 7 acc) + n) 0 <$> varIntHelper
 
 
 
@@ -185,7 +191,7 @@ midiHeader =
     string "MThd"
         *> let
             h =
-                headerChunk <$> uint32 <*> int16 <*> int16 <*> int16
+                headerChunk <$> uint32 <*> uint16 <*> uint16 <*> uint16
            in
             consumeOverspill h 6
                 <?> "header"
@@ -334,7 +340,7 @@ parseEndOfTrack =
 
 parseSequenceNumber : Parser s MidiEvent
 parseSequenceNumber =
-    SequenceNumber <$> (bchar 0x00 *> bchar 0x02 *> int16 <?> "sequence number")
+    SequenceNumber <$> (bchar 0x00 *> bchar 0x02 *> uint16 <?> "sequence number")
 
 
 
@@ -411,7 +417,7 @@ parseChannelPrefix =
 
 parseTempoChange : Parser s MidiEvent
 parseTempoChange =
-    Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24) <?> "tempo change"
+    Tempo <$> (bchar 0x51 *> bchar 0x03 *> uint24) <?> "tempo change"
 
 
 parseSMPTEOffset : Parser s MidiEvent
@@ -686,7 +692,7 @@ buildChannelAfterTouch cmd num =
 
 buildPitchBend : Int -> Int -> Int -> MidiEvent
 buildPitchBend cmd lsb msb =
-    channelBuilder2 PitchBend cmd <| lsb + shiftLeftSeven msb
+    channelBuilder2 PitchBend cmd <| lsb + (shiftLeftBy 7 msb)
 
 
 
@@ -721,24 +727,6 @@ consumeOverspill actual expected =
             )
 
 
-topBitSet : Int -> Bool
-topBitSet n =
-    -- n `and` 0x80 > 0
-    and n 0x80 > 0
-
-
-clearTopBit : Int -> Int
-clearTopBit n =
-    -- n `and` 0x7F
-    and n 0x7F
-
-
-shiftLeftSeven : Int -> Int
-shiftLeftSeven n =
-    -- shiftLeft n 7
-    shiftLeftBy 7 n
-
-
 makeTuple : a -> b -> ( a, b )
 makeTuple a b =
     ( a, b )
@@ -750,7 +738,7 @@ makeTuple a b =
 
 {-| Parse a MIDI event
 -}
-parseMidiEvent : String -> Result.Result String MidiEvent
+parseMidiEvent : String -> Result String MidiEvent
 parseMidiEvent s =
     case Combine.parse (midiEvent Nothing) s of
         Ok ( _, _, n ) ->
@@ -762,7 +750,7 @@ parseMidiEvent s =
 
 {-| entry point - Parse a normalised MIDI file image
 -}
-parse : String -> Result.Result String MidiRecording
+parse : String -> Result String MidiRecording
 parse s =
     case Combine.parse midi s of
         Ok ( _, _, n ) ->
