@@ -4,6 +4,8 @@ import Char
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, intRange)
 import Test exposing (..)
+import Random.Pcg as Random exposing (Generator)
+import Shrink exposing (Shrinker)
 import Midi.Types exposing (..)
 import Midi.Parse exposing (..)
 import Midi.Generate as Generate
@@ -32,6 +34,31 @@ fuzzPositiveVelocity =
 fuzzControllerNumber : Fuzzer Int
 fuzzControllerNumber =
     intRange 0 119
+
+
+generateChannel : Generator Channel
+generateChannel =
+    Random.int 0 15
+
+
+generateNote : Generator Note
+generateNote =
+    Random.int 0 127
+
+
+generateVelocity : Generator Velocity
+generateVelocity =
+    Random.int 0 127
+
+
+generatePositiveVelocity : Generator Velocity
+generatePositiveVelocity =
+    Random.int 1 127
+
+
+generateControllerNumber : Generator Int
+generateControllerNumber =
+    Random.int 0 119
 
 
 fuzzNoteOn : Fuzzer MidiEvent
@@ -69,6 +96,41 @@ fuzzPitchBend =
     Fuzz.map2 PitchBend fuzzChannel (intRange 0 16383)
 
 
+generateNoteOn : Generator MidiEvent
+generateNoteOn =
+    Random.map3 NoteOn generateChannel generateNote generatePositiveVelocity
+
+
+generateNoteOff : Generator MidiEvent
+generateNoteOff =
+    Random.map3 NoteOff generateChannel generateNote generateVelocity
+
+
+generateNoteAfterTouch : Generator MidiEvent
+generateNoteAfterTouch =
+    Random.map3 NoteAfterTouch generateChannel generateNote generateVelocity
+
+
+generateControlChange : Generator MidiEvent
+generateControlChange =
+    Random.map3 ControlChange generateChannel generateControllerNumber generateVelocity
+
+
+generateProgramChange : Generator MidiEvent
+generateProgramChange =
+    Random.map2 ProgramChange generateChannel generateVelocity
+
+
+generateChannelAfterTouch : Generator MidiEvent
+generateChannelAfterTouch =
+    Random.map2 ChannelAfterTouch generateChannel generateVelocity
+
+
+generatePitchBend : Generator MidiEvent
+generatePitchBend =
+    Random.map2 PitchBend generateChannel (Random.int 0 16383)
+
+
 fuzzSysExByte : Fuzzer Byte
 fuzzSysExByte =
     intRange 0 127
@@ -96,37 +158,52 @@ fuzzSysExEvent =
         (Fuzz.list fuzzSysExByte)
 
 
+commonEvents : List (Fuzzer MidiEvent)
+commonEvents =
+    [ fuzzNoteOn
+    , fuzzNoteOff
+    , fuzzNoteAfterTouch
+    , fuzzControlChange
+    , fuzzProgramChange
+    , fuzzPitchBend
+    ]
+
+
+commonEventGenerators : List (Generator MidiEvent)
+commonEventGenerators =
+    [ generateNoteOn
+    , generateNoteOff
+    , generateNoteAfterTouch
+    , generateControlChange
+    , generateProgramChange
+    , generatePitchBend
+    ]
+
+
 fuzzMidiEvent : Fuzzer MidiEvent
 fuzzMidiEvent =
-    Fuzz.oneOf
-        [ fuzzNoteOn
-        , fuzzNoteOff
-        , fuzzNoteAfterTouch
-        , fuzzControlChange
-        , fuzzProgramChange
-        , fuzzPitchBend
-        , fuzzSysExEvent
-        ]
+    Fuzz.oneOf <|
+        commonEvents
+            ++ [ fuzzSysExEvent ]
 
 
-fuzzNumTracks : Fuzzer Int
-fuzzNumTracks =
-    Fuzz.frequency
-        [ ( 50, Fuzz.constant 1 )
-        , ( 30, intRange 2 8 )
-
-        --, ( 19, intRange 9 16 )
-        --, ( 1, intRange 17 255 )
-        ]
+generateMidiFileEvent : Generator MidiEvent
+generateMidiFileEvent =
+    Random.choices commonEventGenerators
 
 
-fuzzMidiRecording : Fuzzer MidiRecording
-fuzzMidiRecording =
-    Fuzz.andThen
+generateMidiMessage : Generator MidiMessage
+generateMidiMessage =
+    Random.pair (Random.int 0 0x0FFFFFFF) generateMidiFileEvent
+
+
+generateMidiRecording : Generator MidiRecording
+generateMidiRecording =
+    Random.andThen
         (\format ->
-            Fuzz.andThen
+            Random.andThen
                 (\numTracks ->
-                    Fuzz.map2
+                    Random.map2
                         (\ticks ->
                             \tracks ->
                                 ( { formatType = format
@@ -135,21 +212,67 @@ fuzzMidiRecording =
                                 , tracks
                                 )
                         )
-                        (intRange 1 0x7FFF)
-                        (listOfLength fuzzTrack numTracks)
+                        (Random.int 1 0x7FFF)
+                        (Random.list 1 generateTrack)
                 )
                 (if format == 0 then
-                    Fuzz.constant 1
+                    Random.constant 1
                  else
-                    fuzzNumTracks
+                    Random.frequency
+                        [ ( 50, Random.constant 1 )
+                        , ( 30, Random.int 2 8 )
+                        , ( 20, Random.int 9 16 )
+                        ]
                 )
         )
-        (intRange 0 2)
+        (Random.int 0 2)
 
 
-fuzzTrack : Fuzzer Track
-fuzzTrack =
-    Fuzz.constant []
+shrinkHeader : Shrinker Header
+shrinkHeader h =
+    -- TODO(rofer): Currently we shrink formatType without regard to how many
+    -- tracks a recording has leading to the possibility that we could shrink
+    -- to an invalid type.
+    Shrink.andMap
+        (Shrink.int h.ticksPerBeat)
+        (Shrink.map Header (Shrink.int h.formatType))
+
+
+shrinkMidiMessage : Shrinker MidiMessage
+shrinkMidiMessage =
+    Shrink.noShrink
+
+
+shrinkMidiTrack : Shrinker Track
+shrinkMidiTrack =
+    Shrink.list shrinkMidiMessage
+
+
+shrinkMidiRecording : Shrinker MidiRecording
+shrinkMidiRecording =
+    -- TODO(rofer): We don't enforce that we always have to have at least one track.
+    Shrink.tuple
+        ( shrinkHeader, Shrink.list shrinkMidiTrack )
+
+
+fuzzMidiRecording : Fuzzer MidiRecording
+fuzzMidiRecording =
+    Fuzz.custom
+        generateMidiRecording
+        shrinkMidiRecording
+
+
+generateTrack : Generator Track
+generateTrack =
+    Random.andThen
+        (\numEvents -> Random.list numEvents generateMidiMessage)
+        (Random.frequency
+            [ ( 25, Random.constant 0 )
+            , ( 50, Random.int 1 8 )
+            , ( 24, Random.int 128 256 )
+            , ( 1, Random.int 1024 2048 )
+            ]
+        )
 
 
 toByteString : List Int -> String
