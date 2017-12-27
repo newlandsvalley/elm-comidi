@@ -199,43 +199,33 @@ generateMidiMessage =
 
 generateMidiRecording : Generator MidiRecording
 generateMidiRecording =
-    Random.andThen
-        (\format ->
-            Random.andThen
-                (\numTracks ->
-                    Random.map2
-                        (\ticks ->
-                            \tracks ->
-                                ( { formatType = format
-                                  , ticksPerBeat = ticks
-                                  }
-                                , tracks
-                                )
-                        )
-                        (Random.int 1 0x7FFF)
-                        (Random.list 1 generateTrack)
+    let
+        generateSingleTrack =
+            Random.map2
+                (\ticks track ->
+                    SingleTrack ticks track
                 )
-                (if format == 0 then
-                    Random.constant 1
-                 else
-                    Random.frequency
-                        [ ( 50, Random.constant 1 )
-                        , ( 30, Random.int 2 8 )
-                        , ( 20, Random.int 9 16 )
-                        ]
+                (Random.int 1 0x7FFF)
+                (generateTrack)
+
+        generateMultipleTracks tracksType =
+            Random.map2
+                (\ticks tracks ->
+                    MultipleTracks tracksType ticks tracks
                 )
-        )
-        (Random.int 0 2)
+                (Random.int 1 0x7FFF)
+                (Random.andThen
+                    (\nTracks -> Random.list nTracks generateTrack)
+                    (Random.int 0 16)
+                )
 
-
-shrinkHeader : Shrinker Header
-shrinkHeader h =
-    -- TODO(rofer): Currently we shrink formatType without regard to how many
-    -- tracks a recording has leading to the possibility that we could shrink
-    -- to an invalid type.
-    Shrink.andMap
-        (Shrink.int h.ticksPerBeat)
-        (Shrink.map Header (Shrink.int h.formatType))
+        generators =
+            [ generateSingleTrack
+            , generateMultipleTracks Simultaneous
+            , generateMultipleTracks Independent
+            ]
+    in
+        Random.choices generators
 
 
 shrinkMidiMessage : Shrinker MidiMessage
@@ -248,11 +238,30 @@ shrinkMidiTrack =
     Shrink.list shrinkMidiMessage
 
 
-shrinkMidiRecording : Shrinker MidiRecording
+shrinkMidiRecordingSameFormat : Shrinker MidiRecording
+shrinkMidiRecordingSameFormat midi =
+    case midi of
+        SingleTrack ticksPerBeat track ->
+            Shrink.map SingleTrack (Shrink.int ticksPerBeat)
+                |> Shrink.andMap (shrinkMidiTrack track)
+
+        MultipleTracks tracksType ticksPerBeat tracks ->
+            Shrink.map (MultipleTracks tracksType) (Shrink.int ticksPerBeat)
+                |> Shrink.andMap (Shrink.list shrinkMidiTrack tracks)
+
+
+shrinkMidiRecordingChangeFormat : Shrinker MidiRecording
+shrinkMidiRecordingChangeFormat midi =
+    case midi of
+        MultipleTracks tracksType ticksPerBeat ((track :: []) as tracks) ->
+            (shrinkMidiRecording (SingleTrack ticksPerBeat track))
+
+        _ ->
+            Shrink.noShrink midi
+
+
 shrinkMidiRecording =
-    -- TODO(rofer): We don't enforce that we always have to have at least one track.
-    Shrink.tuple
-        ( shrinkHeader, Shrink.list shrinkMidiTrack )
+    Shrink.merge shrinkMidiRecordingChangeFormat shrinkMidiRecordingSameFormat
 
 
 fuzzMidiRecording : Fuzzer MidiRecording

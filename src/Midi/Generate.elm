@@ -56,33 +56,37 @@ event event =
 
 
 recording : MidiRecording -> List Byte
-recording ( h, tracks ) =
-    (header h (List.length tracks)) ++ (List.concatMap track tracks)
+recording midi =
+    case midi of
+        SingleTrack ticksPerBeat t ->
+            (header 0 1 ticksPerBeat) ++ track t
+
+        MultipleTracks tracksType ticksPerBeat ts ->
+            let
+                format =
+                    case tracksType of
+                        Simultaneous ->
+                            1
+
+                        Independent ->
+                            2
+            in
+                (header format (List.length ts) ticksPerBeat) ++ (List.concatMap track ts)
 
 
 
 -- Lower level generators
 
 
-header : Header -> Int -> List Byte
-header h trackCount =
-    let
-        format =
-            h.formatType
-
-        numTracks =
-            trackCount
-
-        division =
-            h.ticksPerBeat
-    in
-        List.concat
-            [ strToBytes "MThd"
-            , uint32 6
-            , uint16 format
-            , uint16 numTracks
-            , uint16 division
-            ]
+header : Int -> Int -> Int -> List Byte
+header format numTracks ticksPerBeat =
+    List.concat
+        [ strToBytes "MThd"
+        , uint32 6
+        , uint16 format
+        , uint16 numTracks
+        , uint16 ticksPerBeat
+        ]
 
 
 track : Track -> List Byte
