@@ -1,10 +1,10 @@
 module Midi.Types
     exposing
         ( Track
-        , Header
         , MidiEvent(..)
         , MidiMessage
-        , MidiRecording
+        , TracksType(..)
+        , MidiRecording(..)
         , Byte
         , Channel
         , Note
@@ -97,15 +97,13 @@ type alias Track =
     List MidiMessage
 
 
-{-| Midi Header
--}
-type alias Header =
-    { formatType : Int
-    , ticksPerBeat : Int
-    }
-
-
 {-| Midi Recording
 -}
-type alias MidiRecording =
-    ( Header, List Track )
+type TracksType
+    = Simultaneous
+    | Independent
+
+
+type MidiRecording
+    = SingleTrack Int Track
+    | MultipleTracks TracksType Int (List Track)
