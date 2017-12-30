@@ -1,6 +1,6 @@
 elm-comidi
 ===========
-[![Build Status](https://travis-ci.org/newlandsvalley/elm-comidi.svg?branch=master)](https://travis-ci.org/newlandsvalley/elm-cobmidi)
+[![Build Status](https://travis-ci.org/newlandsvalley/elm-comidi.svg?branch=master)](https://travis-ci.org/newlandsvalley/elm-comidi)
 
 This is a parser for MIDI written in pure Elm 0.18 and using the [elm-combine](https://github.com/Bogdanp/elm-combine) parser combinator library.
 
