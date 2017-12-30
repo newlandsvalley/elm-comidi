@@ -11,6 +11,7 @@ module CoMidi
 # API Reference
 
 @docs normalise, parse, parseMidiEvent
+
 -}
 
 import Combine exposing (..)
@@ -308,8 +309,7 @@ parseMetaString : Int -> Parser s String
 parseMetaString target =
     String.fromList
         -- <$> (bchar target *> varInt `andThen` (\l -> count l anyChar))
-        <$>
-            (bchar target *> varInt >>= (\l -> count l anyChar))
+        <$> (bchar target *> varInt >>= (\l -> count l anyChar))
 
 
 

@@ -23,7 +23,7 @@ type alias Ticks =
 
 
 {-| just a hint that we're really interested in the bytes
-    in some MidiEvent constructores that return Lists
+in some MidiEvent constructores that return Lists
 -}
 type alias Byte =
     Int
@@ -31,8 +31,9 @@ type alias Byte =
 
 {-| Midi Event
 
-  Note that RunningStatus messages are not included within MidiEvent
-  because the parser translates them to the underlying channel messages
+Note that RunningStatus messages are not included within MidiEvent
+because the parser translates them to the underlying channel messages
+
 -}
 type MidiEvent
     = -- meta messages
