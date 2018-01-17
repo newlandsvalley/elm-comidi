@@ -128,7 +128,6 @@ uint32 =
 
 
 -- variable length integers
--- (need to somehow check this for lengths above 16 bits)
 
 
 varIntHelper : Parser s (List Int)
@@ -288,6 +287,7 @@ midiFileEvent parent =
         , Just <$> programChange
         , Just <$> channelAfterTouch
         , Just <$> pitchBend
+        , Just <$> fileSysExEvent
         , Just <$> runningStatus parent
         ]
         <?> "midi event"
@@ -452,7 +452,7 @@ parseSequencerSpecific =
 
 
 
-{- A SysEx event is introduced by an 0XF0 byte and is followed by an array of bytes.
+{- A SysEx event is introduced by an 0xF0 byte and is followed by an array of bytes.
    In Web Midi a sysex event starts with a 0xF0 byte and ends with an EOX (0xF7) byte.
    There are also escaped SysEx messages, but these are only found in MIDI files.
 -}
@@ -461,14 +461,60 @@ parseSequencerSpecific =
 sysExEvent : Parser s MidiEvent
 sysExEvent =
     let
-        notEox c =
-            toCode c /= 0xF7
+        eox =
+            fromCode 0xF7
     in
         (\bytes -> SysEx F0 (bytes ++ [ 0xF7 ]))
             <$> (List.map toCode
-                    <$> (String.toList <$> (bchar 0xF0 *> while notEox))
+                    <$> (String.toList
+                            <$> (bchar 0xF0 *> while ((/=) eox))
+                        )
                 )
             <?> "system exclusive"
+
+
+
+{- A SysEx event in a file is introduced by an 0xF0 or 0xF7 byte and is followed by an
+   array of bytes. If it starts with 0xF0 the bytes must be valid sysex data, but if
+   it starts with 0xF7 any data may follow.
+-}
+
+
+fileSysExEvent : Parser s MidiEvent
+fileSysExEvent =
+    let
+        parseFlavour : Parser s SysExFlavour
+        parseFlavour =
+            (bchar 0xF0 $> F0) <|> (bchar 0xF7 $> F7) <?> "sysex flavour"
+
+        sysexData : Parser s Char
+        sysexData =
+            satisfy (\c -> toCode c < 128)
+
+        parseUnescapedSysex : Parser s MidiEvent
+        parseUnescapedSysex =
+            SysEx
+                <$> (bchar 0xF0 $> F0)
+                <*> (List.map toCode
+                        <$> (varInt
+                                >>= (\n -> count n sysexData)
+                            )
+                    )
+                <?> "unescaped system exclusive"
+
+        parseEscapedSysex : Parser s MidiEvent
+        parseEscapedSysex =
+            SysEx
+                <$> (bchar 0xF7 $> F7)
+                <*> (List.map toCode
+                        <$> (varInt
+                                >>= (\n -> count n anyChar)
+                            )
+                    )
+                <?> "escaped system exclusive"
+    in
+        (parseUnescapedSysex <|> parseEscapedSysex)
+            <?> "system exclusive (MIDI file)"
 
 
 

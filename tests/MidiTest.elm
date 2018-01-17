@@ -136,6 +136,16 @@ fuzzSysExByte =
     intRange 0 127
 
 
+generateSysExByte : Generator Byte
+generateSysExByte =
+    Random.int 0 127
+
+
+generateByte : Generator Byte
+generateByte =
+    Random.int 0 255
+
+
 listOfLength : Fuzzer a -> Int -> Fuzzer (List a)
 listOfLength fuzzer listLen =
     List.foldl
@@ -156,6 +166,33 @@ fuzzSysExEvent =
     Fuzz.map
         (\xs -> SysEx F0 (xs ++ [ 0xF7 ]))
         (Fuzz.list fuzzSysExByte)
+
+
+generateSysExFileEvent : Generator MidiEvent
+generateSysExFileEvent =
+    let
+        unescaped : Generator MidiEvent
+        unescaped =
+            Random.map
+                (SysEx F0)
+                (Random.andThen
+                    (\nBytes -> Random.list nBytes generateSysExByte)
+                    -- NOTE: The parser blows the stack if this is 2048.
+                    (Random.int 0 204)
+                )
+
+        escaped : Generator MidiEvent
+        escaped =
+            Random.map
+                (SysEx F7)
+                (Random.andThen
+                    (\nBytes -> Random.list nBytes generateByte)
+                    -- NOTE: The parser blows the stack if this is 2048.
+                    (Random.int 0 204)
+                )
+    in
+        Random.choices
+            [ unescaped, escaped ]
 
 
 commonEvents : List (Fuzzer MidiEvent)
@@ -189,7 +226,7 @@ fuzzMidiEvent =
 
 generateMidiFileEvent : Generator MidiEvent
 generateMidiFileEvent =
-    Random.choices commonEventGenerators
+    Random.choices (generateSysExFileEvent :: commonEventGenerators)
 
 
 generateMidiMessage : Generator MidiMessage
