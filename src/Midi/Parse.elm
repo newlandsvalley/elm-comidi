@@ -461,22 +461,27 @@ parseSequencerSpecific =
 sysExEvent : Parser s MidiEvent
 sysExEvent =
     let
-        eox =
-            fromCode 0xF7
+        eoxChar =
+            fromCode eox
     in
-        (\bytes -> SysEx F0 (bytes ++ [ 0xF7 ]))
+        (\bytes -> SysEx F0 bytes)
             <$> (List.map toCode
                     <$> (String.toList
-                            <$> (bchar 0xF0 *> while ((/=) eox))
+                            <$> (bchar 0xF0 *> while ((/=) eoxChar))
                         )
                 )
             <?> "system exclusive"
 
 
 
-{- A SysEx event in a file is introduced by an 0xF0 or 0xF7 byte and is followed by an
-   array of bytes. If it starts with 0xF0 the bytes must be valid sysex data, but if
-   it starts with 0xF7 any data may follow.
+{- A SysEx event in a file is introduced by an 0xF0 or 0xF7 byte, followed by a
+   variable length integer that denotes how many data bytes follow.
+   If it starts with 0xF0 the data bytes must be valid sysex data, however if it
+   starts with 0xF7 any data may follow.
+   Note: Since this library doesn't do anything special to handle multi-part
+   SysEx messages it must record the EOX byte as part of the SysEx message
+   here as opposed to for SysEx MIDI events where that byte can be left
+   implicit.
 -}
 
 
@@ -528,12 +533,10 @@ fileSysExEvent =
 
 parseUnspecified : Parser s MidiEvent
 parseUnspecified =
-    -- Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8))
     Unspecified <$> notTrackEnd <*> (int8 >>= (\l -> count l int8))
 
 
 
--- parseUnspecified = log "unspecified" <$> (Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8 )))
 {- parse an entire Track End message - not simply the event -}
 
 
