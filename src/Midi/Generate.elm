@@ -18,7 +18,7 @@ event : MidiEvent -> List Byte
 event event =
     case event of
         SysEx F0 bytes ->
-            0xF0 :: (bytes ++ [eox])
+            0xF0 :: (bytes ++ [ eox ])
 
         SysEx F7 bytes ->
             Debug.crash "WebMIDI SysEx events should all be of the 0xF0 flavor."
