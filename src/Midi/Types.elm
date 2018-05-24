@@ -11,7 +11,12 @@ module Midi.Types
         , Velocity
         , SysExFlavour(..)
         , Ticks
+        , eox
+        , validRecording
         )
+
+import List exposing (..)
+
 
 {-| Type Definition of a MIDI recording
 
@@ -21,8 +26,6 @@ module Midi.Types
 @docs Header, Track, MidiEvent, MidiMessage, MidiRecording
 
 -}
-
-
 type alias Ticks =
     Int
 
@@ -107,3 +110,70 @@ type TracksType
 type MidiRecording
     = SingleTrack Int Track
     | MultipleTracks TracksType Int (List Track)
+
+
+{-| Constants
+-}
+eox =
+    0xF7
+
+
+{-| Helpers
+-}
+
+
+
+{- Returns true if a MidiRecording is valid.
+   Currently this involves verifying multipart sysex messages are broken up correctly.
+-}
+
+
+validRecording : MidiRecording -> Bool
+validRecording r =
+    let
+        validTrack multipart track =
+            case track of
+                [] ->
+                    not multipart
+
+                -- All multipart messages must be finished.
+                t :: ts ->
+                    case ( t, multipart ) of
+                        ( ( _, SysEx F0 data ), False ) ->
+                            case head (reverse data) of
+                                Just eox ->
+                                    validTrack False ts
+
+                                _ ->
+                                    validTrack True ts
+
+                        -- After the first packet all parts of a multipart packet
+                        -- start with F7.
+                        ( ( _, SysEx F0 _ ), True ) ->
+                            False
+
+                        ( ( _, SysEx F7 data ), True ) ->
+                            case head (reverse data) of
+                                Just eox ->
+                                    validTrack False ts
+
+                                _ ->
+                                    validTrack True ts
+
+                        ( ( _, SysEx F7 _ ), False ) ->
+                            validTrack multipart ts
+
+                        -- There must be no MIDI events in between the packets of a
+                        -- multipart sysex message.
+                        ( _, True ) ->
+                            False
+
+                        _ ->
+                            validTrack multipart ts
+    in
+        case r of
+            SingleTrack _ t ->
+                validTrack False t
+
+            MultipleTracks _ _ ts ->
+                all (validTrack False) ts

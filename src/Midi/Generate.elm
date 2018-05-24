@@ -18,10 +18,10 @@ event : MidiEvent -> List Byte
 event event =
     case event of
         SysEx F0 bytes ->
-            0xF0 :: bytes
+            0xF0 :: (bytes ++ [eox])
 
         SysEx F7 bytes ->
-            bytes
+            Debug.crash "WebMIDI SysEx events should all be of the 0xF0 flavor."
 
         NoteOn channel note velocity ->
             [ 0x90 + channel, note, velocity ]
@@ -52,7 +52,7 @@ event event =
                 [ 0xE0 + channel, lower, upper ]
 
         _ ->
-            Debug.crash "TODO"
+            Debug.crash "Unknown MIDI event."
 
 
 recording : MidiRecording -> List Byte

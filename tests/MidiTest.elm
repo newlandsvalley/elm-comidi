@@ -164,7 +164,7 @@ nonEmptyList fuzzer =
 fuzzSysExEvent : Fuzzer MidiEvent
 fuzzSysExEvent =
     Fuzz.map
-        (\xs -> SysEx F0 (xs ++ [ 0xF7 ]))
+        (\xs -> SysEx F0 xs)
         (Fuzz.list fuzzSysExByte)
 
 
@@ -222,6 +222,29 @@ fuzzMidiEvent =
     Fuzz.oneOf <|
         commonEvents
             ++ [ fuzzSysExEvent ]
+
+
+
+-- Note: The type is identical to a track, but these are regular MIDI events
+-- and not MIDI file events (like in generateTrack).
+
+
+fuzzMidiEventSequence : Fuzzer (List ( Ticks, MidiEvent ))
+fuzzMidiEventSequence =
+    Fuzz.list (Fuzz.map2 (,) (intRange 0 0x0FFFFFFF) fuzzMidiEvent)
+
+
+generateTrack : Generator Track
+generateTrack =
+    Random.andThen
+        (\numEvents -> Random.list numEvents generateMidiMessage)
+        (Random.frequency
+            [ ( 25, Random.constant 0 )
+            , ( 50, Random.int 1 8 )
+            , ( 24, Random.int 128 256 )
+            , ( 1, Random.int 1024 2048 )
+            ]
+        )
 
 
 generateMidiFileEvent : Generator MidiEvent
@@ -308,22 +331,20 @@ fuzzMidiRecording =
         shrinkMidiRecording
 
 
-generateTrack : Generator Track
-generateTrack =
-    Random.andThen
-        (\numEvents -> Random.list numEvents generateMidiMessage)
-        (Random.frequency
-            [ ( 25, Random.constant 0 )
-            , ( 50, Random.int 1 8 )
-            , ( 24, Random.int 128 256 )
-            , ( 1, Random.int 1024 2048 )
-            ]
-        )
-
-
 toByteString : List Int -> String
 toByteString list =
     String.fromList (List.map Char.fromCode list)
+
+
+toFileEvent event =
+    case event of
+        -- Note we need to add in the EOX byte when storing
+        -- sysex messages in a MIDI file.
+        SysEx F0 bytes ->
+            SysEx F0 (bytes ++ [ eox ])
+
+        _ ->
+            event
 
 
 suite : Test
@@ -356,4 +377,16 @@ suite =
                     Expect.equal
                         (parseMidiEvent (toByteString (Generate.event noteOn)))
                         (parseMidiEvent (toByteString (Generate.event noteOff)))
+        , fuzz fuzzMidiEventSequence "Ensure toFileEvent helper works correctly." <|
+            \midiEventSequence ->
+                let
+                    midiMessages =
+                        List.map (\( t, e ) -> ( t, toFileEvent e )) midiEventSequence
+
+                    recording =
+                        SingleTrack 1 midiMessages
+                in
+                    Expect.true
+                        "Generated recording is valid."
+                        (validRecording recording)
         ]
