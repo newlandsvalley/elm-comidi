@@ -133,10 +133,10 @@ validRecording r =
     let
         validTrack multipart track =
             case track of
+                -- All multipart messages must be finished.
                 [] ->
                     not multipart
 
-                -- All multipart messages must be finished.
                 t :: ts ->
                     case ( t, multipart ) of
                         ( ( _, SysEx F0 data ), False ) ->
