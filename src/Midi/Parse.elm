@@ -1,4 +1,4 @@
-module CoMidi
+module Midi.Parse
     exposing
         ( normalise
         , parse
@@ -26,7 +26,8 @@ import String exposing (fromList, toList)
 import Debug exposing (..)
 import Maybe exposing (withDefault)
 import Tuple exposing (first, second)
-import MidiTypes exposing (..)
+import Midi.Types exposing (..)
+import Result exposing (Result)
 
 
 -- low level parsers
@@ -39,14 +40,13 @@ int8 =
 
 
 
--- int8 = log "int8" <$> (toCode <$> anyChar)
 {- parse a signed binary 8 bit integer -}
 
 
 signedInt8 : Parser s Int
 signedInt8 =
     (\i ->
-        if (topBitSet i) then
+        if (i > 127) then
             i - 256
         else
             i
@@ -99,50 +99,51 @@ notTrackEnd =
 -- fixed length integers
 
 
-int16 : Parser s Int
-int16 =
+uint16 : Parser s Int
+uint16 =
     let
         toInt16 a b =
-            -- shiftLeft a 8 + b
             shiftLeftBy 8 a + b
     in
         toInt16 <$> int8 <*> int8
 
 
-int24 : Parser s Int
-int24 =
+uint24 : Parser s Int
+uint24 =
     let
         toInt24 a b c =
-            -- shiftLeft a 16 + shiftLeft b 8 + c
             shiftLeftBy 16 a + shiftLeftBy 8 b + c
     in
         toInt24 <$> int8 <*> int8 <*> int8
 
 
-int32 : Parser s Int
-int32 =
+uint32 : Parser s Int
+uint32 =
     let
-        toInt32 a b c d =
-            -- shiftLeft a 24 + shiftLeft b 16 + shiftLeft c 8 + d
+        toUint32 a b c d =
             shiftLeftBy 24 a + shiftLeftBy 16 b + shiftLeftBy 8 c + d
     in
-        toInt32 <$> int8 <*> int8 <*> int8 <*> int8
+        toUint32 <$> int8 <*> int8 <*> int8 <*> int8
 
 
 
 -- variable length integers
--- (need to somehow check this for lengths above 16 bits)
+
+
+varIntHelper : Parser s (List Int)
+varIntHelper =
+    int8
+        >>= (\n ->
+                if (n < 128) then
+                    succeed [ n ]
+                else
+                    ((::) (and 127 n)) <$> varIntHelper
+            )
 
 
 varInt : Parser s Int
 varInt =
-    int8
-        >>= (\n ->
-                if (topBitSet n) then
-                    ((+) ((clearTopBit >> shiftLeftSeven) n)) <$> varInt
-                else
-                    succeed n
-            )
+    List.foldl (\n -> \acc -> (shiftLeftBy 7 acc) + n) 0 <$> varIntHelper
 
 
 
@@ -160,28 +161,22 @@ rest =
 
 midi : Parser s MidiRecording
 midi =
-    -- midiHeader `andThen` midiTracks
-    -- midiHeader >>= midiTracks
     midiHeader
         |> andThen midiTracks
 
 
 
-{- this version of the top level parser just parses many tracks
-      without checking whether the track count agrees with the header
-   midi0 : Parser s MidiRecording
-   midi0 = (,) <$> midiHeader <*> midiTracks0
+{- an internal representation of the header which includes the track count -}
 
-   midiTracks0 : Parser s (List Track)
-   midiTracks0 = many1 midiTrack <?> "midi tracks"
--}
-{- simple parser for headers which assumes chunk size is 6
-   midiHeader : Parser Header
-   midiHeader = string "MThd"
-                  *> int32
-                  *> ( Header <$>  int16 <*> int16 <*> int16 )
-                  <?> "header"
--}
+
+type alias Header =
+    { formatType : Int
+    , trackCount : Int
+    , ticksPerBeat : Int
+    }
+
+
+
 {- parser for headers which quietly eats any extra bytes if we have a non-standard chunk size -}
 
 
@@ -190,7 +185,7 @@ midiHeader =
     string "MThd"
         *> let
             h =
-                headerChunk <$> int32 <*> int16 <*> int16 <*> int16
+                headerChunk <$> uint32 <*> uint16 <*> uint16 <*> uint16
            in
             consumeOverspill h 6
                 <?> "header"
@@ -198,7 +193,23 @@ midiHeader =
 
 midiTracks : Header -> Parser s MidiRecording
 midiTracks h =
-    makeTuple h <$> count h.trackCount midiTrack <?> "midi tracks"
+    case h.formatType of
+        0 ->
+            if h.trackCount == 1 then
+                SingleTrack h.ticksPerBeat <$> midiTrack <?> "midi track for single track file"
+            else
+                fail ("Single track file with " ++ (toString h.trackCount) ++ " tracks.")
+
+        1 ->
+            MultipleTracks Simultaneous h.ticksPerBeat
+                <$> (count h.trackCount midiTrack <?> "midi track for simultaneous tracks file")
+
+        2 ->
+            MultipleTracks Independent h.ticksPerBeat
+                <$> (count h.trackCount midiTrack <?> "midi track for independent tracks file")
+
+        f ->
+            fail ("Unknown MIDI file format " ++ (toString f))
 
 
 
@@ -209,40 +220,37 @@ midiTracks h =
 
 midiTrack : Parser s Track
 midiTrack =
-    string "MTrk" *> int32 *> midiMessages Nothing <?> "midi track"
+    string "MTrk" *> uint32 *> midiMessages Nothing <?> "midi track"
 
 
 midiMessages : Maybe MidiEvent -> Parser s (List MidiMessage)
 midiMessages parent =
     midiMessage parent
-        >>= moreMessageOrEnd
-
-
-moreMessageOrEnd : MidiMessage -> Parser s (List MidiMessage)
-moreMessageOrEnd lastMessage =
-    ((::) lastMessage)
-        <$> choice
-                [ endOfMessages
-                , midiMessages (Just (second lastMessage))
-                ]
+        >>= continueOrNot
 
 
 
-{- we don't place TrackEnd events into the parse tree - there is no need.
-   The end of the track is implied by the end of the event list
+{- Keep reading unless we just saw an End of Track message
+   which would cause us to get Nothing passed in here
 -}
 
 
-endOfMessages : Parser s (List MidiMessage)
-endOfMessages =
-    [] <$ trackEndMessage
+continueOrNot : ( Ticks, Maybe MidiEvent ) -> Parser s (List MidiMessage)
+continueOrNot maybeLastMessage =
+    case maybeLastMessage of
+        ( ticks, Just lastEvent ) ->
+            ((::) ( ticks, lastEvent ))
+                <$> midiMessages (Just lastEvent)
+
+        ( _, Nothing ) ->
+            succeed []
 
 
-midiMessage : Maybe MidiEvent -> Parser s MidiMessage
+midiMessage : Maybe MidiEvent -> Parser s ( Ticks, Maybe MidiEvent )
 midiMessage parent =
     (,)
         <$> varInt
-        <*> midiEvent parent
+        <*> midiFileEvent parent
         <?> "midi message"
 
 
@@ -264,7 +272,23 @@ midiEvent parent =
         , programChange
         , channelAfterTouch
         , pitchBend
-        , runningStatus parent
+        ]
+        <?> "midi event"
+
+
+midiFileEvent : Maybe MidiEvent -> Parser s (Maybe MidiEvent)
+midiFileEvent parent =
+    choice
+        [ metaFileEvent
+        , Just <$> noteOn
+        , Just <$> noteOff
+        , Just <$> noteAfterTouch
+        , Just <$> controlChange
+        , Just <$> programChange
+        , Just <$> channelAfterTouch
+        , Just <$> pitchBend
+        , Just <$> fileSysExEvent
+        , Just <$> runningStatus parent
         ]
         <?> "midi event"
 
@@ -296,9 +320,38 @@ metaEvent =
         <?> "meta event"
 
 
+metaFileEvent : Parser s (Maybe MidiEvent)
+metaFileEvent =
+    bchar 0xFF
+        *> choice
+            [ Just <$> parseSequenceNumber
+            , Just <$> parseText
+            , Just <$> parseCopyright
+            , Just <$> parseTrackName
+            , Just <$> parseInstrumentName
+            , Just <$> parseLyrics
+            , Just <$> parseMarker
+            , Just <$> parseCuePoint
+            , Just <$> parseChannelPrefix
+            , Just <$> parseTempoChange
+            , Just <$> parseSMPTEOffset
+            , Just <$> parseTimeSignature
+            , Just <$> parseKeySignature
+            , Just <$> parseSequencerSpecific
+            , parseEndOfTrack
+            , Just <$> parseUnspecified
+            ]
+        <?> "meta event"
+
+
+parseEndOfTrack : Parser s (Maybe MidiEvent)
+parseEndOfTrack =
+    (bchar 0x2F *> bchar 0x00 *> (succeed Nothing) <?> "sequence number")
+
+
 parseSequenceNumber : Parser s MidiEvent
 parseSequenceNumber =
-    SequenceNumber <$> (bchar 0x00 *> bchar 0x02 *> int16 <?> "sequence number")
+    SequenceNumber <$> (bchar 0x00 *> bchar 0x02 *> uint16 <?> "sequence number")
 
 
 
@@ -363,10 +416,6 @@ parseMarker =
     Marker <$> parseMetaString 0x06 <?> "marker"
 
 
-
--- parseMarker = log "marker" <$> (Marker <$> parseMetaString 0x06 <?> "marker" )
-
-
 parseCuePoint : Parser s MidiEvent
 parseCuePoint =
     CuePoint <$> parseMetaString 0x07 <?> "cue point"
@@ -379,11 +428,7 @@ parseChannelPrefix =
 
 parseTempoChange : Parser s MidiEvent
 parseTempoChange =
-    Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24) <?> "tempo change"
-
-
-
--- parseTempoChange = log "set tempo" <$> (Tempo <$> (bchar 0x51 *> bchar 0x03 *> int24 ) <?> "tempo change")
+    Tempo <$> (bchar 0x51 *> bchar 0x03 *> uint24) <?> "tempo change"
 
 
 parseSMPTEOffset : Parser s MidiEvent
@@ -396,17 +441,9 @@ parseTimeSignature =
     bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8) <?> "time signature"
 
 
-
--- parseTimeSignature = log "time sig" <$> (bchar 0x58 *> bchar 0x04 *> (buildTimeSig <$> int8 <*> int8 <*> int8 <*> int8 ) <?> "time signature" )
-
-
 parseKeySignature : Parser s MidiEvent
 parseKeySignature =
     bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8)
-
-
-
--- parseKeySignature = log "key sig" <$>  (bchar 0x59 *> bchar 0x02 *> (KeySignature <$> signedInt8 <*> int8))
 
 
 parseSequencerSpecific : Parser s MidiEvent
@@ -415,15 +452,74 @@ parseSequencerSpecific =
 
 
 
-{- a SysEx event may be introduced by either 0xF0 or 0XF7 and is followed by a
-   counted array of bytes.  F7 packets may include an embedded F0 packet but
-   this parser treats an embedded packet simply as opaque data.
+{- A SysEx event is introduced by an 0xF0 byte and is followed by an array of bytes.
+   In Web Midi a sysex event starts with a 0xF0 byte and ends with an EOX (0xF7) byte.
+   There are also escaped SysEx messages, but these are only found in MIDI files.
 -}
 
 
 sysExEvent : Parser s MidiEvent
 sysExEvent =
-    SysEx <$> (List.map toCode <$> (bchoice 0xF0 0xF7 *> varInt >>= (\l -> count l anyChar))) <?> "system exclusive"
+    let
+        eoxChar =
+            fromCode eox
+    in
+        (\bytes -> SysEx F0 bytes)
+            <$> (List.map toCode
+                    <$> (String.toList
+                            <$> (bchar 0xF0 *> while ((/=) eoxChar))
+                        )
+                )
+            <?> "system exclusive"
+
+
+
+{- A SysEx event in a file is introduced by an 0xF0 or 0xF7 byte, followed by a
+   variable length integer that denotes how many data bytes follow.
+   If it starts with 0xF0 the data bytes must be valid sysex data, however if it
+   starts with 0xF7 any data may follow.
+   Note: Since this library doesn't do anything special to handle multi-part
+   SysEx messages it must record the EOX byte as part of the SysEx message
+   here as opposed to for SysEx MIDI events where that byte can be left
+   implicit.
+-}
+
+
+fileSysExEvent : Parser s MidiEvent
+fileSysExEvent =
+    let
+        parseFlavour : Parser s SysExFlavour
+        parseFlavour =
+            (bchar 0xF0 $> F0) <|> (bchar 0xF7 $> F7) <?> "sysex flavour"
+
+        sysexData : Parser s Char
+        sysexData =
+            satisfy (\c -> toCode c < 128)
+
+        parseUnescapedSysex : Parser s MidiEvent
+        parseUnescapedSysex =
+            SysEx
+                <$> (bchar 0xF0 $> F0)
+                <*> (List.map toCode
+                        <$> (varInt
+                                >>= (\n -> count n sysexData)
+                            )
+                    )
+                <?> "unescaped system exclusive"
+
+        parseEscapedSysex : Parser s MidiEvent
+        parseEscapedSysex =
+            SysEx
+                <$> (bchar 0xF7 $> F7)
+                <*> (List.map toCode
+                        <$> (varInt
+                                >>= (\n -> count n anyChar)
+                            )
+                    )
+                <?> "escaped system exclusive"
+    in
+        (parseUnescapedSysex <|> parseEscapedSysex)
+            <?> "system exclusive (MIDI file)"
 
 
 
@@ -437,12 +533,10 @@ sysExEvent =
 
 parseUnspecified : Parser s MidiEvent
 parseUnspecified =
-    -- Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8))
     Unspecified <$> notTrackEnd <*> (int8 >>= (\l -> count l int8))
 
 
 
--- parseUnspecified = log "unspecified" <$> (Unspecified <$> notTrackEnd <*> (int8 `andThen` (\l -> count l int8 )))
 {- parse an entire Track End message - not simply the event -}
 
 
@@ -658,7 +752,7 @@ buildChannelAfterTouch cmd num =
 
 buildPitchBend : Int -> Int -> Int -> MidiEvent
 buildPitchBend cmd lsb msb =
-    channelBuilder2 PitchBend cmd <| lsb + shiftLeftSeven msb
+    channelBuilder2 PitchBend cmd <| lsb + (shiftLeftBy 7 msb)
 
 
 
@@ -693,44 +787,18 @@ consumeOverspill actual expected =
             )
 
 
-topBitSet : Int -> Bool
-topBitSet n =
-    -- n `and` 0x80 > 0
-    and n 0x80 > 0
-
-
-clearTopBit : Int -> Int
-clearTopBit n =
-    -- n `and` 0x7F
-    and n 0x7F
-
-
-shiftLeftSeven : Int -> Int
-shiftLeftSeven n =
-    -- shiftLeft n 7
-    shiftLeftBy 7 n
-
-
 makeTuple : a -> b -> ( a, b )
 makeTuple a b =
     ( a, b )
 
 
 
-{- Experimental and not working how I want it: expect a value matching the supplied function
-   expect : (a -> Bool) -> Parser a -> Parser a
-   expect f p = p `andThen`
-             (\b -> case f b of
-               True -> succeed b
-               _ -> fail [ "unexpected:" ++ toString b ]
-             )
--}
 -- exported functions
 
 
 {-| Parse a MIDI event
 -}
-parseMidiEvent : String -> Result.Result String MidiEvent
+parseMidiEvent : String -> Result String MidiEvent
 parseMidiEvent s =
     case Combine.parse (midiEvent Nothing) s of
         Ok ( _, _, n ) ->
@@ -742,16 +810,12 @@ parseMidiEvent s =
 
 {-| entry point - Parse a normalised MIDI file image
 -}
-parse : String -> Result.Result String MidiRecording
+parse : String -> Result String MidiRecording
 parse s =
     case Combine.parse midi s of
-        -- case Combine.parse (midi <* end) s of
-        -- ( Ok n, _ ) ->
         Ok ( _, _, n ) ->
             Ok n
 
-        -- ( Err ms, cx ) ->
-        --    Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString cx))
         Err ( _, ctx, ms ) ->
             Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString ctx))
 
