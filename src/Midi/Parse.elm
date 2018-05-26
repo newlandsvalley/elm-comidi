@@ -1,8 +1,8 @@
 module Midi.Parse
     exposing
         ( normalise
-        , parse
-        , parseMidiEvent
+        , file
+        , event
         )
 
 {-| Library for parsing MIDI files
@@ -10,15 +10,11 @@ module Midi.Parse
 
 # API Reference
 
-@docs normalise, parse, parseMidiEvent
+@docs normalise, file, event
 
 -}
 
 import Combine exposing (..)
-
-
--- import Combine.Infix exposing (..)
-
 import Combine.Char exposing (..)
 import Bitwise exposing (..)
 import Char exposing (fromCode, toCode)
@@ -798,8 +794,8 @@ makeTuple a b =
 
 {-| Parse a MIDI event
 -}
-parseMidiEvent : String -> Result String MidiEvent
-parseMidiEvent s =
+event : String -> Result String MidiEvent
+event s =
     case Combine.parse (midiEvent Nothing) s of
         Ok ( _, _, n ) ->
             Ok n
@@ -810,8 +806,8 @@ parseMidiEvent s =
 
 {-| entry point - Parse a normalised MIDI file image
 -}
-parse : String -> Result String MidiRecording
-parse s =
+file : String -> Result String MidiRecording
+file s =
     case Combine.parse midi s of
         Ok ( _, _, n ) ->
             Ok n
@@ -820,7 +816,9 @@ parse s =
             Err ("parse error: " ++ (toString ms) ++ ", " ++ (toString ctx))
 
 
-{-| normalise the input before we parse by masking off all but the least significant 8 bits
+{-| Normalise the input before we parse by masking off all but the least
+significant 8 bits. We assume the string contains only bytes so this
+should be a no-op.
 -}
 normalise : String -> String
 normalise =
