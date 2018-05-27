@@ -13,7 +13,7 @@ import String exposing (..)
 import Result exposing (..)
 import BinaryFileIO.Ports exposing (..)
 import Json.Decode as Json exposing (..)
-import Midi.Parse exposing (normalise, parse)
+import Midi.Parse
 import Midi.Types exposing (MidiRecording)
 import Debug exposing (..)
 
@@ -71,8 +71,8 @@ update msg model =
                     Just f ->
                         ( { model
                             | recording =
-                                normalise f.contents
-                                    |> parse
+                                Midi.Parse.normalise f.contents
+                                    |> Midi.Parse.file
                             , name = Just f.name
                           }
                         , Cmd.none

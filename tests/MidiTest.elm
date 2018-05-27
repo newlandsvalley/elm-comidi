@@ -7,7 +7,7 @@ import Test exposing (..)
 import Random.Pcg as Random exposing (Generator)
 import Shrink exposing (Shrinker)
 import Midi.Types exposing (..)
-import Midi.Parse exposing (..)
+import Midi.Parse as Parse
 import Midi.Generate as Generate
 
 
@@ -354,12 +354,12 @@ suite =
             \event ->
                 Expect.equal
                     (Ok event)
-                    (parseMidiEvent (toByteString (Generate.event event)))
+                    (Parse.event (toByteString (Generate.event event)))
         , fuzz fuzzMidiRecording "Go from MidiRecording to \"Binary\" and back" <|
             \recording ->
                 Expect.equal
                     (Ok recording)
-                    (parse (toByteString (Generate.recording recording)))
+                    (Parse.file (toByteString (Generate.recording recording)))
         , fuzz
             (Fuzz.tuple
                 ( fuzzChannel, fuzzNote )
@@ -375,8 +375,8 @@ suite =
                         NoteOff channel note 0
                 in
                     Expect.equal
-                        (parseMidiEvent (toByteString (Generate.event noteOn)))
-                        (parseMidiEvent (toByteString (Generate.event noteOff)))
+                        (Parse.event (toByteString (Generate.event noteOn)))
+                        (Parse.event (toByteString (Generate.event noteOff)))
         , fuzz fuzzMidiEventSequence "Ensure toFileEvent helper works correctly." <|
             \midiEventSequence ->
                 let

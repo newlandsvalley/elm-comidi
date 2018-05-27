@@ -1,5 +1,14 @@
 # Changelog
 
+### Version 3.0.0  (2018-05-26)
+
+* Major renaming and refactoring
+* Added support for generating MIDI bytes (in Midi.Generate)
+* Added tests and fixed a lot of bugs that were uncovered
+* Re-though several datatypes
+* Added support for SysEx
+* Improved handling of running status
+
 ### Version 2.2.0  (2017-01-30)
 
 * Added parseMidiEvent.
