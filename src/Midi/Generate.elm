@@ -1,6 +1,6 @@
 module Midi.Generate exposing (event, recording)
 
-{-| Library for encoding MIDI types as "binary"
+{-| Module for encoding MIDI types as "binary"
 
 
 # API Reference
@@ -14,6 +14,8 @@ import Char
 import Midi.Types exposing (..)
 
 
+{-| Generate a MIDI event
+-}
 event : MidiEvent -> List Byte
 event event =
     case event of
@@ -55,6 +57,8 @@ event event =
             Debug.crash "Unknown MIDI event."
 
 
+{-| Generate a MIDI recording
+-}
 recording : MidiRecording -> List Byte
 recording midi =
     case midi of

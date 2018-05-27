@@ -15,15 +15,28 @@ module Midi.Types
         , validRecording
         )
 
-import List exposing (..)
-
-
 {-| Type Definition of a MIDI recording
 
 
 # Data Types
 
-@docs Header, Track, MidiEvent, MidiMessage, MidiRecording
+@docs Track, MidiEvent, MidiMessage, TracksType, MidiRecording, Byte, Channel
+
+@docs Note, Velocity, SysExFlavour, Ticks
+
+
+# Functions
+
+@docs eox, validRecording
+
+-}
+
+import List exposing (..)
+
+
+{-| Midi Tick
+
+elapsed time
 
 -}
 type alias Ticks =
@@ -37,16 +50,34 @@ type alias Byte =
     Int
 
 
+{-| Midi Channel
+-}
 type alias Channel =
     Int
 
 
+{-| Midi Note
+-}
 type alias Note =
     Int
 
 
+{-| Midi Velocity (
+volume
+-}
 type alias Velocity =
     Int
+
+
+{-| SysExFlavour
+
+Discriminate between two different forms of SysExEvrnt as characterised by the
+lead-in byte, See <https://www.csie.ntu.edu.tw/~r92092/ref/midi/#sysex_event>.
+
+-}
+type SysExFlavour
+    = F0 -- normal
+    | F7 -- escaped
 
 
 {-| Midi Event
@@ -55,11 +86,6 @@ Note that RunningStatus messages are not included within MidiEvent
 because the parser translates them to the underlying channel messages
 
 -}
-type SysExFlavour
-    = F0 -- normal
-    | F7 -- escaped
-
-
 type MidiEvent
     = -- meta messages
       SequenceNumber Int
@@ -100,13 +126,16 @@ type alias Track =
     List MidiMessage
 
 
-{-| Midi Recording
+{-| Discriminate between the types of tracks in a recording.
+Are they played simultaneously or independently.
 -}
 type TracksType
     = Simultaneous
     | Independent
 
 
+{-| Midi Recording
+-}
 type MidiRecording
     = SingleTrack Int Track
     | MultipleTracks TracksType Int (List Track)
@@ -114,6 +143,7 @@ type MidiRecording
 
 {-| Constants
 -}
+eox : Int
 eox =
     0xF7
 

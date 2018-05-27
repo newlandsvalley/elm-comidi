@@ -7,7 +7,9 @@
         "src"
     ],
     "exposed-modules": [
-        "Midi"
+        "Midi.Generate",
+        "Midi.Parse",
+        "Midi.Types"
     ],
     "dependencies": {
         "Bogdanp/elm-combine": "3.1.1 <= v < 4.0.0",

@@ -5,7 +5,7 @@ module Midi.Parse
         , event
         )
 
-{-| Library for parsing MIDI files
+{-| Module for parsing MIDI files
 
 
 # API Reference
